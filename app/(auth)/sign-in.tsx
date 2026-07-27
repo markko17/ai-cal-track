@@ -61,12 +61,15 @@ export default function SignInScreen() {
           signedInAt: new Date().toISOString(),
         });
 
-        // Save/Update user profile info in Firestore
-        await saveUserToFirestore({
-          uid: result.createdSessionId || 'user_' + Date.now(),
-          email: email.trim(),
-          authProvider: 'email_password',
-        });
+        // Save/Update user profile info in Firestore using stable Clerk user id
+        const clerkUserId = (result as any).createdUserId || (result as any).userId || '';
+        if (clerkUserId) {
+          await saveUserToFirestore({
+            uid: clerkUserId,
+            email: email.trim(),
+            authProvider: 'email_password',
+          });
+        }
 
         router.replace('/');
       } else {
@@ -168,7 +171,7 @@ export default function SignInScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Text style={styles.inputLabel}>Password</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/(auth)/sign-in')}>
                 <Text style={styles.forgotPasswordText}>Forgot?</Text>
               </TouchableOpacity>
             </View>

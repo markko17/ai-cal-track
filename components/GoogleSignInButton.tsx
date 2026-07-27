@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { saveUserToFirestore } from '../services/userService';
 import { saveUserSession } from '../utils/cache';
 
@@ -13,6 +13,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 export function useWarmUpBrowser() {
   useEffect(() => {
+    if (Platform.OS !== 'android') return;
     void WebBrowser.warmUpAsync();
     return () => {
       void WebBrowser.coolDownAsync();
@@ -44,23 +45,21 @@ export default function GoogleSignInButton({ onError, text = 'Continue with Goog
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
 
-        // Save basic user info to Firestore if available in OAuth response
         const email = signUp?.emailAddress || signIn?.identifier || '';
         const firstName = signUp?.firstName || '';
         const lastName = signUp?.lastName || '';
+        // Use stable Clerk user id (not session id) for Firestore document key
+        const clerkUserId = signUp?.createdUserId || (signIn as any)?.createdUserId || '';
 
-        if (createdSessionId) {
-          await saveUserSession({
-            sessionId: createdSessionId,
-            email,
-            firstName,
-            lastName,
-            authProvider: 'google',
-            signedInAt: new Date().toISOString(),
-          });
+        await saveUserSession({
+          sessionId: createdSessionId,
+          authProvider: 'google',
+          signedInAt: new Date().toISOString(),
+        });
 
-          saveUserToFirestore({
-            uid: createdSessionId,
+        if (clerkUserId) {
+          await saveUserToFirestore({
+            uid: clerkUserId,
             email,
             firstName,
             lastName,
@@ -69,6 +68,9 @@ export default function GoogleSignInButton({ onError, text = 'Continue with Goog
         }
 
         router.replace('/');
+      } else {
+        const msg = 'Google sign-in did not return a session. Please try again.';
+        if (onError) onError(msg);
       }
     } catch (err: any) {
       console.error('Google OAuth Error:', err);

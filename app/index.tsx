@@ -1,7 +1,7 @@
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { saveUserToFirestore } from '../services/userService';
 import { clearUserSession, saveUserSession } from '../utils/cache';
@@ -11,26 +11,28 @@ export default function Index() {
   const { signOut } = useAuth();
   const router = useRouter();
 
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+
   // Save session info to local storage and sync user data to Firebase Firestore
   useEffect(() => {
     if (isSignedIn && user) {
-      // 1. Save locally
+      // 1. Save locally (non-sensitive id + timestamp only)
       saveUserSession({
         id: user.id,
-        email: user.primaryEmailAddress?.emailAddress || '',
-        fullName: user.fullName || user.firstName || '',
-        imageUrl: user.imageUrl || '',
         lastActive: new Date().toISOString(),
       });
 
       // 2. Save/Sync user profile to Firebase Firestore database if not already exists
+      setSyncStatus('pending');
       saveUserToFirestore({
         uid: user.id,
         email: user.primaryEmailAddress?.emailAddress || '',
         fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Fitness Enthusiast',
         imageUrl: user.imageUrl || '',
         authProvider: 'clerk',
-      });
+      })
+        .then(() => setSyncStatus('success'))
+        .catch(() => setSyncStatus('error'));
     }
   }, [isSignedIn, user]);
 
@@ -75,17 +77,31 @@ export default function Index() {
               <Text style={styles.userName}>{userFullName}</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.signOutBtn}
+            onPress={handleSignOut}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Sign out"
+          >
             <Ionicons name="log-out-outline" size={20} color="#F87171" />
           </TouchableOpacity>
         </View>
 
         {/* Firestore Saved Status Card */}
         <View style={styles.statusBadgeCard}>
-          <Ionicons name="cloud-done-outline" size={20} color="#10B981" style={{ marginRight: 10 }} />
+          {syncStatus === 'error' ? (
+            <Ionicons name="cloud-offline-outline" size={20} color="#F87171" style={{ marginRight: 10 }} />
+          ) : (
+            <Ionicons name="cloud-done-outline" size={20} color={syncStatus === 'success' ? '#10B981' : '#64748B'} style={{ marginRight: 10 }} />
+          )}
           <View style={{ flex: 1 }}>
-            <Text style={styles.statusTitle}>Firestore Profile Active</Text>
-            <Text style={styles.statusSub}>{userEmail} synced to Firebase</Text>
+            <Text style={[styles.statusTitle, syncStatus === 'error' && { color: '#F87171' }]}>
+              {syncStatus === 'error' ? 'Sync Failed' : syncStatus === 'success' ? 'Firestore Profile Active' : 'Syncing Profile…'}
+            </Text>
+            <Text style={styles.statusSub}>
+              {syncStatus === 'error' ? 'Could not save profile to Firebase' : `${userEmail} synced to Firebase`}
+            </Text>
           </View>
         </View>
 
@@ -102,21 +118,20 @@ export default function Index() {
             </View>
           </View>
 
-          {/* Calorie Ring Summary */}
+          {/* Empty state — real data will come from meal tracking */}
           <View style={styles.calorieStatRow}>
             <View style={styles.statCol}>
-              <Text style={styles.statNumber}>1,450</Text>
-
+              <Text style={styles.statNumber}>—</Text>
               <Text style={styles.statLabel}>Consumed</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
-              <Text style={[styles.statNumber, { color: '#10B981' }]}>550</Text>
+              <Text style={[styles.statNumber, { color: '#10B981' }]}>—</Text>
               <Text style={styles.statLabel}>Remaining</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statCol}>
-              <Text style={styles.statNumber}>380</Text>
+              <Text style={styles.statNumber}>—</Text>
               <Text style={styles.statLabel}>Burned</Text>
             </View>
           </View>
@@ -124,46 +139,19 @@ export default function Index() {
           {/* Macro Bars */}
           <View style={styles.macroSection}>
             <Text style={styles.macroTitle}>Macros Breakdown</Text>
-
-            {/* Protein */}
-            <View style={styles.macroRow}>
-              <View style={styles.macroLabelRow}>
-                <Text style={styles.macroName}>Protein</Text>
-                <Text style={styles.macroValue}>110g / 150g</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: '73%', backgroundColor: '#10B981' }]} />
-              </View>
-            </View>
-
-            {/* Carbs */}
-            <View style={styles.macroRow}>
-              <View style={styles.macroLabelRow}>
-                <Text style={styles.macroName}>Carbs</Text>
-                <Text style={styles.macroValue}>140g / 200g</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: '70%', backgroundColor: '#3B82F6' }]} />
-              </View>
-            </View>
-
-            {/* Fats */}
-            <View style={styles.macroRow}>
-              <View style={styles.macroLabelRow}>
-                <Text style={styles.macroName}>Fats</Text>
-                <Text style={styles.macroValue}>42g / 65g</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: '64%', backgroundColor: '#F59E0B' }]} />
-              </View>
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <Ionicons name="restaurant-outline" size={32} color="#334155" />
+              <Text style={{ color: '#64748B', fontSize: 13, marginTop: 8, textAlign: 'center' }}>
+                {'No meals logged yet.\nSnap a meal to start tracking!'}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* AI Snap Meal Action Button */}
-        <TouchableOpacity style={styles.aiSnapBtn} activeOpacity={0.85}>
+        {/* AI Snap Meal Action Button — coming soon */}
+        <TouchableOpacity style={[styles.aiSnapBtn, { opacity: 0.5 }]} disabled activeOpacity={1}>
           <Ionicons name="camera-outline" size={24} color="#0F172A" style={{ marginRight: 10 }} />
-          <Text style={styles.aiSnapBtnText}>Snap & Track Meal with AI</Text>
+          <Text style={styles.aiSnapBtnText}>Snap & Track Meal (Coming Soon)</Text>
         </TouchableOpacity>
 
         {/* Quick Auth Info Summary */}
