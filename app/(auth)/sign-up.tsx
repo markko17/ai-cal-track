@@ -121,13 +121,16 @@ export default function SignUpScreen() {
           signedInAt: new Date().toISOString(),
         });
 
-        // Save new user profile to Firebase Firestore
-        await saveUserToFirestore({
-          uid: completeSignUp.createdSessionId || 'user_' + Date.now(),
-          email: email.trim(),
-          fullName: fullName.trim(),
-          authProvider: 'email_password',
-        });
+        // Save new user profile to Firebase Firestore using stable Clerk user id
+        const clerkUserId = completeSignUp.createdUserId || '';
+        if (clerkUserId) {
+          await saveUserToFirestore({
+            uid: clerkUserId,
+            email: email.trim(),
+            fullName: fullName.trim(),
+            authProvider: 'email_password',
+          });
+        }
 
         router.replace('/');
       } else {

@@ -19,11 +19,19 @@ const createNativeTokenCache = (): TokenCache => {
         return null;
       }
     },
-    saveToken: (key: string, value: string) => {
-      return SecureStore.setItemAsync(key, value);
+    saveToken: async (key: string, value: string) => {
+      try {
+        await SecureStore.setItemAsync(key, value);
+      } catch (error) {
+        console.error('SecureStore setItem error: ', error);
+      }
     },
-    clearToken: (key: string) => {
-      return SecureStore.deleteItemAsync(key);
+    clearToken: async (key: string) => {
+      try {
+        await SecureStore.deleteItemAsync(key);
+      } catch (error) {
+        console.error('SecureStore deleteItem error: ', error);
+      }
     },
   };
 };
@@ -67,13 +75,15 @@ export const tokenCache = Platform.OS !== 'web' ? createNativeTokenCache() : cre
 // Helper functions for saving/retrieving user session locally
 export const saveUserSession = async (userData: Record<string, any>): Promise<void> => {
   try {
-    const jsonValue = JSON.stringify(userData);
     if (Platform.OS === 'web') {
+      // On web, only persist non-sensitive session fields to localStorage
+      const webSafeData = { id: userData.id, lastActive: userData.lastActive };
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('user_session', jsonValue);
+        localStorage.setItem('user_session', JSON.stringify(webSafeData));
       }
     } else {
-      await SecureStore.setItemAsync('user_session', jsonValue);
+      // On native, SecureStore is encrypted — safe to store full session
+      await SecureStore.setItemAsync('user_session', JSON.stringify(userData));
     }
   } catch (error) {
     console.error('Error saving user session to local storage: ', error);
