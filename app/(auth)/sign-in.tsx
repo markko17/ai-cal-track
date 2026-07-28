@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import GoogleSignInButton from '../../components/GoogleSignInButton';
+import Colors from '../../constants/colors';
 import { saveUserToFirestore } from '../../services/userService';
 import { saveUserSession } from '../../utils/cache';
 
@@ -110,7 +111,7 @@ export default function SignInScreen() {
               />
             </View>
             <View style={styles.aiBadge}>
-              <Ionicons name="sparkles" size={12} color="#10B981" />
+              <Ionicons name="sparkles" size={12} color={Colors.primary} />
               <Text style={styles.aiBadgeText}>AI NUTRITION 2.0</Text>
             </View>
           </View>
@@ -138,10 +139,10 @@ export default function SignInScreen() {
           {/* Error Message Alert */}
           {errorMessage ? (
             <View style={styles.errorAlert}>
-              <Ionicons name="alert-circle" size={20} color="#F87171" style={{ marginRight: 8 }} />
+              <Ionicons name="alert-circle" size={20} color={Colors.error} style={{ marginRight: 8 }} />
               <Text style={styles.errorText}>{errorMessage}</Text>
               <TouchableOpacity onPress={() => setErrorMessage('')} style={{ marginLeft: 8 }}>
-                <Ionicons name="close" size={18} color="#9CA3AF" />
+                <Ionicons name="close" size={18} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
           ) : null}
@@ -150,11 +151,11 @@ export default function SignInScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Email Address</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={20} color={Colors.inputIcon} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="name@example.com"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={Colors.textMuted}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -176,11 +177,11 @@ export default function SignInScreen() {
               </TouchableOpacity>
             </View>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.inputIcon} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={Colors.textMuted}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -195,7 +196,7 @@ export default function SignInScreen() {
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
-                  color="#94A3B8"
+                  color={Colors.inputIcon}
                 />
               </TouchableOpacity>
             </View>
@@ -209,11 +210,11 @@ export default function SignInScreen() {
             activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color="#0F172A" size="small" />
+              <ActivityIndicator color={Colors.textOnPrimary} size="small" />
             ) : (
               <View style={styles.primaryBtnContent}>
                 <Text style={styles.primaryBtnText}>Sign In</Text>
-                <Ionicons name="arrow-forward" size={18} color="#0F172A" style={{ marginLeft: 6 }} />
+                <Ionicons name="arrow-forward" size={18} color={Colors.textOnPrimary} style={{ marginLeft: 6 }} />
               </View>
             )}
           </TouchableOpacity>
@@ -252,7 +253,7 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0F17',
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -274,13 +275,13 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 20,
-    backgroundColor: '#1E293B',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: Colors.cardBorder,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
-    shadowColor: '#10B981',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
@@ -294,15 +295,15 @@ const styles = StyleSheet.create({
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: Colors.primaryGlow,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: Colors.primaryBorder,
   },
   aiBadgeText: {
-    color: '#10B981',
+    color: Colors.primary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -311,24 +312,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: Colors.text,
     textAlign: 'center',
     marginBottom: 8,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 290,
   },
   cardContainer: {
-    backgroundColor: '#161F2E',
+    backgroundColor: Colors.card,
     borderRadius: 28,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#26334D',
+    borderColor: Colors.cardBorder,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#0B0F17',
+    backgroundColor: Colors.inputBg,
     borderRadius: 14,
     padding: 4,
     marginBottom: 24,
@@ -349,23 +350,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeTab: {
-    backgroundColor: '#1E293B',
+    backgroundColor: Colors.surface,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textMuted,
   },
   activeTabText: {
-    color: '#10B981',
+    color: Colors.primary,
     fontWeight: '700',
   },
   errorAlert: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    backgroundColor: Colors.errorBg,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: Colors.errorBorder,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -373,7 +374,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    color: '#F87171',
+    color: Colors.error,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -389,20 +390,20 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#CBD5E1',
+    color: Colors.textSecondary,
     marginBottom: 8,
   },
   forgotPasswordText: {
     fontSize: 12,
-    color: '#10B981',
+    color: Colors.primary,
     fontWeight: '600',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B0F17',
+    backgroundColor: Colors.inputBg,
     borderWidth: 1,
-    borderColor: '#26334D',
+    borderColor: Colors.inputBorder,
     borderRadius: 16,
     paddingHorizontal: 14,
     height: 54,
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: '#F8FAFC',
+    color: Colors.text,
     fontSize: 15,
     height: '100%',
   },
@@ -420,14 +421,14 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   primaryBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: Colors.primary,
     borderRadius: 16,
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 20,
-    shadowColor: '#10B981',
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -441,7 +442,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtnText: {
-    color: '#0F172A',
+    color: Colors.textOnPrimary,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -454,10 +455,10 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#26334D',
+    backgroundColor: Colors.divider,
   },
   dividerText: {
-    color: '#64748B',
+    color: Colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
     paddingHorizontal: 12,
@@ -467,11 +468,11 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   footerText: {
-    color: '#94A3B8',
+    color: Colors.textSecondary,
     fontSize: 14,
   },
   footerLink: {
-    color: '#10B981',
+    color: Colors.primary,
     fontWeight: '700',
   },
 });

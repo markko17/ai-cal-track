@@ -1,15 +1,34 @@
 import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Text, View } from 'react-native';
 import { tokenCache } from '../utils/cache';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 
 export default function RootLayout() {
+  if (!publishableKey) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#090D16', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: '#FF4D4D', fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+          Missing Clerk Publishable Key
+        </Text>
+        <Text style={{ color: '#A0AEC0', textAlign: 'center', fontSize: 14 }}>
+          Please restart the Expo server with clean cache to load your .env file:
+        </Text>
+        <Text style={{ color: '#10B981', marginTop: 12, fontFamily: 'monospace' }}>
+          npx expo start -c
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="generate-plan" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack>
       <ClerkLoaded>
