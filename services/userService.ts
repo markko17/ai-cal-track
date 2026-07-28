@@ -84,24 +84,31 @@ export const saveUserToFirestore = async (userData: UserProfileData) => {
     }
   } catch (error) {
     console.error('❌ [Firebase] Error saving user profile to Firestore:', error);
+    throw error;
   }
 };
 
+export interface FirestoreUserResult {
+  exists: boolean;
+  data: Record<string, any> | null;
+  error?: any;
+}
+
 /**
- * Get user document from Firestore
+ * Get user document from Firestore distinctly distinguishing missing records from errors
  */
-export const getUserFromFirestore = async (uid: string): Promise<Record<string, any> | null> => {
-  if (!uid) return null;
+export const getUserFromFirestore = async (uid: string): Promise<FirestoreUserResult> => {
+  if (!uid) return { exists: false, data: null };
   try {
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
     if (userSnap.exists()) {
-      return userSnap.data();
+      return { exists: true, data: userSnap.data() };
     }
-    return null;
+    return { exists: false, data: null };
   } catch (error) {
     console.error('❌ [Firebase] Error getting user profile from Firestore:', error);
-    return null;
+    return { exists: false, data: null, error };
   }
 };
 
@@ -124,6 +131,7 @@ export const updateUserOnboarding = async (uid: string, onboardingData: Record<s
     console.log('✅ [Firebase] User onboarding saved to Firestore:', uid);
   } catch (error) {
     console.error('❌ [Firebase] Error updating user onboarding in Firestore:', error);
+    throw error;
   }
 };
 
@@ -143,8 +151,10 @@ export const saveUserOnboardingToStorage = async (uid: string, data: Record<stri
     }
   } catch (error) {
     console.error('Error saving onboarding data to storage:', error);
+    throw error;
   }
 };
+
 
 /**
  * Get user onboarding details from SecureStore / localStorage

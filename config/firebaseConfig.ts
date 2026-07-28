@@ -13,12 +13,13 @@ const firebaseConfig = {
   appId: cleanVal(process.env.EXPO_PUBLIC_FIREBASE_APP_ID),
 };
 
-// Validate required Firebase config values (warn instead of crash)
+// Validate required Firebase config values (fail fast if missing)
 const REQUIRED_KEYS = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'] as const;
 const missingKeys = REQUIRED_KEYS.filter((key) => !firebaseConfig[key]);
 if (missingKeys.length > 0) {
-  console.warn(`[Firebase] Missing config keys: ${missingKeys.join(', ')}. Restart Expo server with: npx expo start -c`);
+  throw new Error(`[Firebase] Missing config keys: ${missingKeys.join(', ')}. Restart Expo server with: npx expo start -c`);
 }
+
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
