@@ -1,6 +1,6 @@
 import HugeIcon from '@/components/HugeIcon';
 import Colors from '@/constants/colors';
-import { generateFitnessPlanWithAI, GeneratedFitnessPlan, UserOnboardingInput } from '@/services/geminiService';
+import { GeneratedFitnessPlan, generateFitnessPlanWithAI, UserOnboardingInput } from '@/services/geminiService';
 import { getUserOnboardingFromStorage, saveUserOnboardingToStorage, updateUserOnboarding } from '@/services/userService';
 import { useUser } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -193,8 +193,9 @@ export default function GeneratePlanScreen() {
   }, [isLoaded, user?.id]);
 
   const handleFinishAndGoToDashboard = () => {
-    router.replace('/');
+    router.replace('/(tabs)' as any);
   };
+
 
   // Render Animated Loading Screen with Interactive Step Checklist
   if (isGenerating) {
