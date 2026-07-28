@@ -27,7 +27,7 @@ const LOADING_STEPS = [
 ];
 
 export default function GeneratePlanScreen() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const router = useRouter();
   const params = useLocalSearchParams();
 
@@ -36,17 +36,20 @@ export default function GeneratePlanScreen() {
   const [isGenerating, setIsGenerating] = useState(true);
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedFitnessPlan | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [saveWarningMsg, setSaveWarningMsg] = useState('');
 
   // Animated progress bar
   const progressAnim = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
+    if (!isLoaded) return;
     let isMounted = true;
 
     async function runAIPipeline() {
       try {
         setIsGenerating(true);
         setErrorMsg('');
+        setSaveWarningMsg('');
         setCompletedSteps([]);
         setActiveStepIndex(0);
 
@@ -139,12 +142,18 @@ export default function GeneratePlanScreen() {
           onboardingCompleted: true,
         };
 
+        let hasSaveError = false;
         if (user?.id) {
-          // Persist locally
-          await saveUserOnboardingToStorage(user.id, planPayload);
+          try {
+            // Persist locally
+            await saveUserOnboardingToStorage(user.id, planPayload);
 
-          // Persist to Firebase Firestore
-          await updateUserOnboarding(user.id, planPayload);
+            // Persist to Firebase Firestore
+            await updateUserOnboarding(user.id, planPayload);
+          } catch (saveErr) {
+            console.warn('⚠️ Could not save plan to storage or database:', saveErr);
+            hasSaveError = true;
+          }
         }
 
         if (!isMounted) return;
@@ -162,6 +171,9 @@ export default function GeneratePlanScreen() {
 
         if (isMounted) {
           setGeneratedPlan(aiPlan);
+          if (hasSaveError) {
+            setSaveWarningMsg('Your plan was created successfully, but saving it to your account encountered an issue. Your metrics are displayed below.');
+          }
           setIsGenerating(false);
         }
       } catch (err: any) {
@@ -178,7 +190,7 @@ export default function GeneratePlanScreen() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isLoaded, user?.id]);
 
   const handleFinishAndGoToDashboard = () => {
     router.replace('/');
@@ -278,6 +290,13 @@ export default function GeneratePlanScreen() {
           <Text style={styles.headerTitle}>Your Daily Nutrition Target</Text>
           <Text style={styles.headerSub}>Personalized based on your goals and biometric profile</Text>
         </View>
+
+        {saveWarningMsg ? (
+          <View style={{ backgroundColor: Colors.errorBg, borderWidth: 1, borderColor: Colors.errorBorder, borderRadius: 14, padding: 12, marginBottom: 16 }}>
+            <Text style={{ color: Colors.error, fontSize: 13, textAlign: 'center' }}>{saveWarningMsg}</Text>
+          </View>
+        ) : null}
+
 
         {/* Hero Daily Calorie Card */}
         <View style={styles.heroCalorieCard}>

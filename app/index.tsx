@@ -41,14 +41,14 @@ export default function Index() {
       // 2. Save/Sync basic user profile to Firestore
       setSyncStatus('pending');
       try {
-        await saveUserToFirestore({
+        const syncRes = await saveUserToFirestore({
           uid: user.id,
           email: user.primaryEmailAddress?.emailAddress || '',
           fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Fitness Enthusiast',
           imageUrl: user.imageUrl || '',
           authProvider: 'clerk',
         });
-        if (isMounted) setSyncStatus('success');
+        if (isMounted && syncRes) setSyncStatus('success');
       } catch (e) {
         if (isMounted) setSyncStatus('error');
       }
@@ -65,8 +65,15 @@ export default function Index() {
         }
 
         // Check Firestore database
-        const dbUser = await getUserFromFirestore(user.id);
-        if (dbUser?.onboardingCompleted || dbUser?.gender) {
+        const dbResult = await getUserFromFirestore(user.id);
+        if (dbResult.error) {
+          console.error('Error fetching Firestore user profile:', dbResult.error);
+          if (isMounted) setCheckingOnboarding(false);
+          return;
+        }
+
+        const dbUser = dbResult.data;
+        if (dbResult.exists && (dbUser?.onboardingCompleted || dbUser?.gender)) {
           // Cache to local storage for future fast loads
           await saveUserOnboardingToStorage(user.id, dbUser);
           if (isMounted) {
@@ -76,7 +83,7 @@ export default function Index() {
           return;
         }
 
-        // User does not have onboarding information in database or storage -> redirect to step form
+        // User explicitly does not have onboarding information in database or storage -> redirect to step form
         if (isMounted) {
           setNeedsOnboarding(true);
           setCheckingOnboarding(false);
@@ -86,6 +93,7 @@ export default function Index() {
         if (isMounted) setCheckingOnboarding(false);
       }
     }
+
 
     checkUserAndOnboarding();
 

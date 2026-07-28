@@ -115,7 +115,7 @@ export function calculateFallbackPlan(data: UserOnboardingInput): GeneratedFitne
 
   const proteinPct = Math.round((proteinCalories / dailyCalories) * 100);
   const fatPct = Math.round((fatCalories / dailyCalories) * 100);
-  const carbsPct = 100 - proteinPct - fatPct;
+  const carbsPct = Math.max(0, 100 - proteinPct - fatPct);
 
   return {
     dailyCalories,
@@ -137,17 +137,36 @@ export function calculateFallbackPlan(data: UserOnboardingInput): GeneratedFitne
 }
 
 /**
- * Calls Gemini AI API to generate a personalized fitness plan based on user profile details.
+ * Calls Gemini AI API via server proxy (or fallback) to generate a personalized fitness plan.
  */
 export async function generateFitnessPlanWithAI(data: UserOnboardingInput): Promise<GeneratedFitnessPlan> {
-  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 15000);
 
-  if (!apiKey) {
-    console.log('💡 [Gemini API] No EXPO_PUBLIC_GEMINI_API_KEY found in env. Using formula-based plan calculation.');
-    return calculateFallbackPlan(data);
-  }
+  try {
+    let resJson: any = null;
+    const serverKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 
-  const prompt = `You are a world-class sports nutritionist and fitness expert.
+    // Attempt to call server-side proxy route first
+    try {
+      const proxyResponse = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+
+      if (proxyResponse.ok) {
+        resJson = await proxyResponse.json();
+      }
+    } catch (_proxyErr) {
+      // Proxy unavailable; fall back to direct call if serverKey is present
+      if (serverKey) {
+        const prompt = `You are a world-class sports nutritionist and fitness expert.
 Analyze the following user profile and return a JSON object containing accurate daily calorie, macronutrient, and hydration targets.
 
 User Profile:
@@ -178,56 +197,69 @@ JSON Structure:
   }
 }`;
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${serverKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: 'application/json',
-        },
-      }),
-    });
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: 'application/json',
+            },
+          }),
+          signal: controller.signal,
+        });
 
-    if (!response.ok) {
-      console.warn(`[Gemini API] Request failed with status ${response.status}. Falling back to formula plan.`);
+        if (response.ok) {
+          resJson = await response.json();
+        }
+      }
+    }
+
+    clearTimeout(timeoutId);
+
+    if (!resJson) {
       return calculateFallbackPlan(data);
     }
 
-    const resJson = await response.json();
     const rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-
     if (!rawText) {
       return calculateFallbackPlan(data);
     }
 
     const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed: GeneratedFitnessPlan = JSON.parse(cleanedText);
+    const parsed: Partial<GeneratedFitnessPlan> = JSON.parse(cleanedText);
+
+    const macroObj = (parsed.macroPercentages || {}) as Record<string, any>;
+    const proteinPct = typeof macroObj.protein === 'number' && !isNaN(macroObj.protein) ? macroObj.protein : 30;
+    const carbsPct = typeof macroObj.carbs === 'number' && !isNaN(macroObj.carbs) ? macroObj.carbs : 45;
+    const fatPct = typeof macroObj.fat === 'number' && !isNaN(macroObj.fat) ? macroObj.fat : 25;
+
 
     return {
-      dailyCalories: parsed.dailyCalories || 2000,
-      proteinGrams: parsed.proteinGrams || 150,
-      carbsGrams: parsed.carbsGrams || 200,
-      fatGrams: parsed.fatGrams || 65,
-      waterIntakeLiters: parsed.waterIntakeLiters || 3.0,
-      waterIntakeGlasses: parsed.waterIntakeGlasses || 12,
-      bmi: parsed.bmi || 23.0,
+      dailyCalories: typeof parsed.dailyCalories === 'number' ? parsed.dailyCalories : 2000,
+      proteinGrams: typeof parsed.proteinGrams === 'number' ? parsed.proteinGrams : 150,
+      carbsGrams: typeof parsed.carbsGrams === 'number' ? parsed.carbsGrams : 200,
+      fatGrams: typeof parsed.fatGrams === 'number' ? parsed.fatGrams : 65,
+      waterIntakeLiters: typeof parsed.waterIntakeLiters === 'number' ? parsed.waterIntakeLiters : 3.0,
+      waterIntakeGlasses: typeof parsed.waterIntakeGlasses === 'number' ? parsed.waterIntakeGlasses : 12,
+      bmi: typeof parsed.bmi === 'number' ? parsed.bmi : 23.0,
       bmiCategory: parsed.bmiCategory || 'Normal weight',
       targetWeightPace: parsed.targetWeightPace || 'Balanced maintenance',
       fitnessAdvice: parsed.fitnessAdvice || 'Maintain a balanced diet and stay consistent with your workout routine.',
-      macroPercentages: parsed.macroPercentages || { protein: 30, carbs: 45, fat: 25 },
+      macroPercentages: {
+        protein: proteinPct,
+        carbs: carbsPct,
+        fat: fatPct,
+      },
     };
   } catch (err) {
-    console.error('❌ [Gemini API] Error generating plan:', err);
+    clearTimeout(timeoutId);
+    console.error('❌ [Gemini API] Request failed or timed out:', err);
     return calculateFallbackPlan(data);
   }
 }
+

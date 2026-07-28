@@ -62,6 +62,7 @@ export default function OnboardingScreen() {
       const dayNum = parseInt(day, 10);
       const monthNum = parseInt(month, 10);
       const yearNum = parseInt(year, 10);
+      const currentYear = new Date().getFullYear();
       if (
         isNaN(dayNum) ||
         dayNum < 1 ||
@@ -71,7 +72,7 @@ export default function OnboardingScreen() {
         monthNum > 12 ||
         isNaN(yearNum) ||
         yearNum < 1920 ||
-        yearNum > 2018
+        yearNum > currentYear
       ) {
         setErrorMsg('Please enter a realistic birthdate.');
         return;
@@ -104,6 +105,10 @@ export default function OnboardingScreen() {
 
     if (isNaN(parsedFeet) || parsedFeet < 3 || parsedFeet > 8) {
       setErrorMsg('Please enter a valid height in feet (e.g. 5).');
+      return;
+    }
+    if (isNaN(parsedInches) || parsedInches < 0 || parsedInches > 11) {
+      setErrorMsg('Please enter valid height inches (0–11).');
       return;
     }
     if (isNaN(parsedWeight) || parsedWeight < 20 || parsedWeight > 300) {
@@ -245,7 +250,8 @@ export default function OnboardingScreen() {
           {/* STEP 2: FITNESS GOAL */}
           {currentStep === 2 && (
             <View style={styles.stepContainer}>
-              <Text style={styles.stepTitle}>What's Your Goal?</Text>
+              <Text style={styles.stepTitle}>{"What's Your Goal?"}</Text>
+
               <Text style={styles.stepSubTitle}>
                 Your target guides your daily calorie surplus or deficit.
               </Text>

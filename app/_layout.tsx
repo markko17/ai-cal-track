@@ -2,6 +2,7 @@ import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Text, View } from 'react-native';
+import Colors from '../constants/colors';
 import { tokenCache } from '../utils/cache';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
@@ -9,19 +10,20 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 export default function RootLayout() {
   if (!publishableKey) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#090D16', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <Text style={{ color: '#FF4D4D', fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+      <View style={{ flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: Colors.error, fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
           Missing Clerk Publishable Key
         </Text>
-        <Text style={{ color: '#A0AEC0', textAlign: 'center', fontSize: 14 }}>
+        <Text style={{ color: Colors.textSecondary, textAlign: 'center', fontSize: 14 }}>
           Please restart the Expo server with clean cache to load your .env file:
         </Text>
-        <Text style={{ color: '#10B981', marginTop: 12, fontFamily: 'monospace' }}>
+        <Text style={{ color: Colors.success, marginTop: 12, fontFamily: 'monospace' }}>
           npx expo start -c
         </Text>
       </View>
     );
   }
+
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
