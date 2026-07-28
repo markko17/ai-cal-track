@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Colors from '../constants/colors';
 import { saveUserToFirestore } from '../services/userService';
 import { saveUserSession } from '../utils/cache';
 
@@ -91,7 +92,7 @@ export default function GoogleSignInButton({ onError, text = 'Continue with Goog
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color="#10B981" size="small" />
+        <ActivityIndicator color={Colors.primary} size="small" />
       ) : (
         <View style={styles.btnContent}>
           <Ionicons name="logo-google" size={20} color="#EA4335" style={styles.icon} />
@@ -104,9 +105,9 @@ export default function GoogleSignInButton({ onError, text = 'Continue with Goog
 
 const styles = StyleSheet.create({
   googleBtn: {
-    backgroundColor: '#1E293B',
+    backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: Colors.cardBorder,
     borderRadius: 16,
     height: 56,
     justifyContent: 'center',
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   googleBtnText: {
-    color: '#F8FAFC',
+    color: Colors.text,
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.2,
