@@ -34,15 +34,17 @@ export function SegmentedHalfCircleProgress30({
     const cx = size / 2;
     const cy = size / 2;
 
+    const safeSegments = Math.max(1, Math.floor(segments || 14));
+
     const totalAngle = 180;
     const maxTotalGap = totalAngle * 0.4;
-    const maxGapPerSegment = maxTotalGap / Math.max(segments - 1, 1);
+    const maxGapPerSegment = maxTotalGap / Math.max(safeSegments - 1, 1);
     const effectiveGap = Math.min(Math.max(0, gapAngle), maxGapPerSegment);
-    const totalGap = effectiveGap * (segments - 1);
+    const totalGap = effectiveGap * (safeSegments - 1);
 
-    const segmentAngle = (totalAngle - totalGap) / Math.max(segments, 1);
+    const segmentAngle = (totalAngle - totalGap) / safeSegments;
 
-    const activeSegments = Math.round(clamped * segments);
+    const activeSegments = Math.round(clamped * safeSegments);
 
     const polarToCartesian = (angle: number) => {
         const rad = (Math.PI / 180) * angle;
@@ -68,7 +70,7 @@ export function SegmentedHalfCircleProgress30({
     return (
         <View style={{ width: size, height: svgHeight, alignItems: 'center', justifyContent: 'flex-end' }}>
             <Svg width={size} height={svgHeight}>
-                {Array.from({ length: segments }).map((_, i) => {
+                {Array.from({ length: safeSegments }).map((_, i) => {
                     const start = currentAngle;
                     const end = currentAngle - segmentAngle;
                     currentAngle = end - effectiveGap;
