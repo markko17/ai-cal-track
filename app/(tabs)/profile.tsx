@@ -3,9 +3,10 @@ import { getUserFromFirestore, getUserOnboardingFromStorage } from '@/services/u
 import { clearUserSession } from '@/utils/cache';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -22,34 +23,45 @@ export default function ProfileTabScreen() {
 
   const [profileData, setProfileData] = useState<any>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchProfile() {
-      if (!user?.id) return;
-      try {
-        const local = await getUserOnboardingFromStorage(user.id);
-        if (local && isMounted) {
-          setProfileData(local);
-          return;
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      async function fetchProfile() {
+        if (!user?.id) return;
+        try {
+          const local = await getUserOnboardingFromStorage(user.id);
+          if (local && isMounted) {
+            setProfileData(local);
+            return;
+          }
+          const dbRes = await getUserFromFirestore(user.id);
+          if (dbRes.exists && dbRes.data && isMounted) {
+            setProfileData(dbRes.data);
+          }
+        } catch (err) {
+          console.error('Error reading profile info:', err);
         }
-        const dbRes = await getUserFromFirestore(user.id);
-        if (dbRes.exists && dbRes.data && isMounted) {
-          setProfileData(dbRes.data);
-        }
-      } catch (err) {
-        console.error('Error reading profile info:', err);
       }
-    }
-    fetchProfile();
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
+      fetchProfile();
+      return () => {
+        isMounted = false;
+      };
+    }, [user?.id])
+  );
 
   const handleSignOut = async () => {
-    await clearUserSession();
-    await signOut();
-    router.replace('/(auth)/sign-in');
+    try {
+      await clearUserSession();
+      await signOut();
+    } catch (err: any) {
+      console.error('Error during sign out:', err);
+      Alert.alert(
+        'Sign Out Notice',
+        err?.message || 'Could not complete remote sign out, but local session was cleared.'
+      );
+    } finally {
+      router.replace('/(auth)/sign-in');
+    }
   };
 
   const userEmail = user?.primaryEmailAddress?.emailAddress || 'User';

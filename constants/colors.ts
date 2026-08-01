@@ -1,45 +1,45 @@
 export const Colors = {
-  // Main Theme Base
-  background: '#111111',
-  surface: '#1A1A1A',
-  surfaceLight: '#242424',
-  card: '#161616',
-  cardBorder: '#2A2A2A',
-  inputBg: '#0D0D0D',
+  // Main Theme Base - Clean Modern Light Mode (Matching reference design)
+  background: '#FFFFFF',
+  surface: '#F6F7FA',
+  surfaceLight: '#EEF0F5',
+  card: '#F6F7FA',
+  cardBorder: '#E5E7EB',
+  inputBg: '#F3F4F6',
 
-  // Primary Branding Accent (Gold / Gymrat Premium)
-  primary: '#C8A96E',
-  primaryDark: '#B29358',
-  primaryLight: '#DFBF83',
-  primaryGlow: 'rgba(200, 169, 110, 0.15)',
-  primaryBorder: 'rgba(200, 169, 110, 0.35)',
+  // Primary Branding Accent (Dark Solid Black)
+  primary: '#111827',
+  primaryDark: '#000000',
+  primaryLight: '#374151',
+  primaryGlow: 'rgba(17, 24, 39, 0.05)',
+  primaryBorder: 'rgba(17, 24, 39, 0.15)',
 
   // Text Colors
-  text: '#F5F5F5',
-  textSecondary: '#9E9E9E',
-  textMuted: '#666666',
-  textOnPrimary: '#111111',
+  text: '#111827',
+  textSecondary: '#4B5563',
+  textMuted: '#9CA3AF',
+  textOnPrimary: '#FFFFFF',
 
   // Status & Notifications
   success: '#10B981',
-  successBg: 'rgba(16, 185, 129, 0.12)',
-  successBorder: 'rgba(16, 185, 129, 0.3)',
+  successBg: 'rgba(16, 185, 129, 0.08)',
+  successBorder: 'rgba(16, 185, 129, 0.25)',
 
-  error: '#F87171',
-  errorBg: 'rgba(248, 113, 113, 0.12)',
-  errorBorder: 'rgba(248, 113, 113, 0.3)',
+  error: '#EF4444',
+  errorBg: 'rgba(239, 68, 68, 0.08)',
+  errorBorder: 'rgba(239, 68, 68, 0.25)',
 
   // Macros & Stats
-  protein: '#C8A96E',
+  protein: '#111827',
   carbs: '#3B82F6',
   fats: '#F59E0B',
 
   // UI Component Specific
-  divider: '#262626',
-  tabActive: '#262626',
-  tabInactive: '#111111',
-  inputBorder: '#333333',
-  inputIcon: '#888888',
+  divider: '#E5E7EB',
+  tabActive: '#111827',
+  tabInactive: '#FFFFFF',
+  inputBorder: '#E5E7EB',
+  inputIcon: '#9CA3AF',
 };
 
 export default Colors;

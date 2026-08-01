@@ -3,7 +3,7 @@ import Colors from '@/constants/colors';
 import { saveUserOnboardingToStorage, updateUserOnboarding } from '@/services/userService';
 import { useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -26,6 +26,12 @@ export default function OnboardingScreen() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Input Refs for Auto Advance
+  const monthRef = useRef<TextInput>(null);
+  const yearRef = useRef<TextInput>(null);
+  const heightInchesRef = useRef<TextInput>(null);
+  const weightKgRef = useRef<TextInput>(null);
 
   // Form State
   const [gender, setGender] = useState('');
@@ -393,9 +399,14 @@ export default function OnboardingScreen() {
                     onChangeText={(t) => {
                       setDay(t);
                       if (errorMsg) setErrorMsg('');
+                      if (t.length >= 2) {
+                        monthRef.current?.focus();
+                      }
                     }}
                     keyboardType="number-pad"
                     maxLength={2}
+                    returnKeyType="next"
+                    onSubmitEditing={() => monthRef.current?.focus()}
                   />
                 </View>
 
@@ -403,6 +414,7 @@ export default function OnboardingScreen() {
                 <View style={styles.dateCol}>
                   <Text style={styles.inputFieldLabel}>Month</Text>
                   <TextInput
+                    ref={monthRef}
                     style={styles.dateInput}
                     placeholder="MM"
                     placeholderTextColor={Colors.textMuted}
@@ -410,9 +422,14 @@ export default function OnboardingScreen() {
                     onChangeText={(t) => {
                       setMonth(t);
                       if (errorMsg) setErrorMsg('');
+                      if (t.length >= 2) {
+                        yearRef.current?.focus();
+                      }
                     }}
                     keyboardType="number-pad"
                     maxLength={2}
+                    returnKeyType="next"
+                    onSubmitEditing={() => yearRef.current?.focus()}
                   />
                 </View>
 
@@ -420,6 +437,7 @@ export default function OnboardingScreen() {
                 <View style={[styles.dateCol, { flex: 1.4 }]}>
                   <Text style={styles.inputFieldLabel}>Year</Text>
                   <TextInput
+                    ref={yearRef}
                     style={styles.dateInput}
                     placeholder="YYYY"
                     placeholderTextColor={Colors.textMuted}
@@ -430,6 +448,8 @@ export default function OnboardingScreen() {
                     }}
                     keyboardType="number-pad"
                     maxLength={4}
+                    returnKeyType="done"
+                    onSubmitEditing={handleNextStep}
                   />
                 </View>
               </View>
@@ -458,14 +478,21 @@ export default function OnboardingScreen() {
                       onChangeText={(t) => {
                         setHeightFeet(t);
                         if (errorMsg) setErrorMsg('');
+                        if (t.length >= 1) {
+                          heightInchesRef.current?.focus();
+                        }
                       }}
-                      keyboardType="decimal-pad"
+                      keyboardType="number-pad"
+                      maxLength={1}
+                      returnKeyType="next"
+                      onSubmitEditing={() => heightInchesRef.current?.focus()}
                     />
                     <Text style={styles.unitText}>ft</Text>
                   </View>
 
                   <View style={[styles.metricInputWrapper, { flex: 1 }]}>
                     <TextInput
+                      ref={heightInchesRef}
                       style={styles.metricInput}
                       placeholder="10"
                       placeholderTextColor={Colors.textMuted}
@@ -473,8 +500,14 @@ export default function OnboardingScreen() {
                       onChangeText={(t) => {
                         setHeightInches(t);
                         if (errorMsg) setErrorMsg('');
+                        if (t.length >= 2) {
+                          weightKgRef.current?.focus();
+                        }
                       }}
                       keyboardType="number-pad"
+                      maxLength={2}
+                      returnKeyType="next"
+                      onSubmitEditing={() => weightKgRef.current?.focus()}
                     />
                     <Text style={styles.unitText}>in</Text>
                   </View>
@@ -487,6 +520,7 @@ export default function OnboardingScreen() {
                 <View style={styles.metricInputWrapper}>
                   <HugeIcon name="weight" size={20} color={Colors.primary} />
                   <TextInput
+                    ref={weightKgRef}
                     style={styles.metricInput}
                     placeholder="75"
                     placeholderTextColor={Colors.textMuted}
@@ -496,6 +530,9 @@ export default function OnboardingScreen() {
                       if (errorMsg) setErrorMsg('');
                     }}
                     keyboardType="decimal-pad"
+                    maxLength={5}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmitOnboarding}
                   />
                   <Text style={styles.unitText}>kg</Text>
                 </View>
