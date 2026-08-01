@@ -32,6 +32,10 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="generate-plan" options={{ headerShown: false }} />
+        <Stack.Screen name="log-exercise" options={{ headerShown: false }} />
+        <Stack.Screen name="exercise-details" options={{ headerShown: false }} />
+        <Stack.Screen name="workout-burn" options={{ headerShown: false }} />
+        <Stack.Screen name="manual-calories" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack>
       <ClerkLoaded>

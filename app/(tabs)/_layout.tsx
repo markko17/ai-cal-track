@@ -1,8 +1,16 @@
-import Colors from '@/constants/colors';
-import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
+import AddLogModal from "@/components/AddLogModal";
+import Colors from "@/constants/colors";
 import {
+  addWaterLogToFirestore,
+  formatDateKey,
+} from "@/services/dailyLogService";
+import { useUser } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { Tabs, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import {
+  Alert,
   Modal,
   Platform,
   StyleSheet,
@@ -10,48 +18,74 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-function CustomTabBar({ state, descriptors, navigation }: any) {
+function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { user } = useUser();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isPlusModalVisible, setIsPlusModalVisible] = useState(false);
-  const [actionAlertMsg, setActionAlertMsg] = useState('');
+  const [isAddLogModalOpen, setIsAddLogModalOpen] = useState(false);
+  const [logModalInitialType, setLogModalInitialType] = useState<
+    "meal" | "workout"
+  >("meal");
+  const [isPaidUser, setIsPaidUser] = useState(false); // Mock paid status toggle
 
-  const handleQuickAction = (actionTitle: string) => {
-    setActionAlertMsg(`${actionTitle} recorded!`);
-    setTimeout(() => {
-      setActionAlertMsg('');
-      setIsPlusModalVisible(false);
-    }, 1200);
+  const closePlusModal = useCallback(() => {
+    setIsPlusModalVisible(false);
+  }, []);
+
+  const handleOpenExercise = () => {
+    setIsPlusModalVisible(false);
+    router.push("/log-exercise" as any);
   };
 
-  const bottomMargin = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 16;
+  const handleOpenWater = async () => {
+    if (user?.id) {
+      try {
+        await addWaterLogToFirestore(user.id, formatDateKey(new Date()), 0.25);
+      } catch (err) {
+        console.error("Error logging water from quick actions:", err);
+      }
+    }
+    closePlusModal();
+  };
+
+  const handleOpenFoodDb = () => {
+    closePlusModal();
+    setLogModalInitialType("meal");
+    setIsAddLogModalOpen(true);
+  };
+
+  const handleScanFood = () => {
+    if (!isPaidUser) {
+      Alert.alert("PRO Feature", "Scan food requires PRO access.");
+      return;
+    }
+
+    closePlusModal();
+    Alert.alert(
+      "📷 AI Food Scanner",
+      "Point your camera at your meal or barcode to auto-detect calories & macros.",
+      [{ text: "Start Scan (Mock)", onPress: () => {} }],
+    );
+  };
+
+  const bottomMargin = Platform.OS === "ios" ? Math.max(insets.bottom, 16) : 16;
 
   return (
     <>
       <View style={[styles.floatingTabBarWrapper, { bottom: bottomMargin }]}>
-        {/* Floating Rounded Plus Button Centered Above Tab Bar */}
-        <TouchableOpacity
-          style={styles.plusFloatingBtnCenter}
-          onPress={() => setIsPlusModalVisible(true)}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Add quick entry"
-        >
-          <Ionicons name="add" size={28} color={Colors.textOnPrimary} />
-        </TouchableOpacity>
-
         <View style={styles.floatingTabBarCard}>
           {/* 3 Tabs: Home, Analytics, Profile */}
           <View style={styles.tabsRow}>
             {state.routes.map((route: any, index: number) => {
-              const { options } = descriptors[route.key];
               const isFocused = state.index === index;
 
               const onPress = () => {
                 const event = navigation.emit({
-                  type: 'tabPress',
+                  type: "tabPress",
                   target: route.key,
                   canPreventDefault: true,
                 });
@@ -61,18 +95,18 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 }
               };
 
-              let iconName: keyof typeof Ionicons.glyphMap = 'home-outline';
-              let tabTitle = 'Home';
+              let iconName: keyof typeof Ionicons.glyphMap = "home-outline";
+              let tabTitle = "Home";
 
-              if (route.name === 'index') {
-                iconName = isFocused ? 'home' : 'home-outline';
-                tabTitle = 'Home';
-              } else if (route.name === 'analytics') {
-                iconName = isFocused ? 'stats-chart' : 'stats-chart-outline';
-                tabTitle = 'Analytics';
-              } else if (route.name === 'profile') {
-                iconName = isFocused ? 'person' : 'person-outline';
-                tabTitle = 'Profile';
+              if (route.name === "index") {
+                iconName = isFocused ? "home" : "home-outline";
+                tabTitle = "Home";
+              } else if (route.name === "analytics") {
+                iconName = isFocused ? "bar-chart" : "bar-chart-outline";
+                tabTitle = "Progress";
+              } else if (route.name === "profile") {
+                iconName = isFocused ? "settings" : "settings-outline";
+                tabTitle = "Settings";
               }
 
               return (
@@ -103,91 +137,124 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               );
             })}
           </View>
+
+          {/* Floating Rounded Plus Button on the Right Side */}
+          <TouchableOpacity
+            style={styles.plusFloatingBtnRight}
+            onPress={() => setIsPlusModalVisible(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Add quick entry"
+          >
+            <Ionicons name="add" size={32} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
-
-      {/* Quick Action Modal Sheet */}
+      {/* 4-Option Grid Modal Sheet above the floating button */}
       <Modal
         visible={isPlusModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsPlusModalVisible(false)}
+        onRequestClose={closePlusModal}
       >
-        <TouchableWithoutFeedback onPress={() => setIsPlusModalVisible(false)}>
+        <TouchableWithoutFeedback onPress={closePlusModal}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalSheetCard}>
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalTitle}>Quick Log & Snap</Text>
-                <Text style={styles.modalSubTitle}>Choose an action to quickly track your daily progress</Text>
-
-                {actionAlertMsg ? (
-                  <View style={styles.successAlertBox}>
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} style={{ marginRight: 8 }} />
-                    <Text style={styles.successAlertText}>{actionAlertMsg}</Text>
+              <View
+                style={[
+                  styles.grid2x2Container,
+                  { marginBottom: bottomMargin + 16 },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.gridCard}
+                  onPress={handleOpenExercise}
+                  activeOpacity={0.8}
+                >
+                  <View
+                    style={[
+                      styles.cardIconBg,
+                      { backgroundColor: "rgba(249, 115, 22, 0.16)" },
+                    ]}
+                  >
+                    <Ionicons
+                      name="barbell-outline"
+                      size={26}
+                      color="#F97316"
+                    />
                   </View>
-                ) : (
-                  <View style={styles.modalActionsGrid}>
-                    <TouchableOpacity
-                      style={styles.actionRowBtn}
-                      onPress={() => handleQuickAction('Meal Log')}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.actionIconBg, { backgroundColor: Colors.primaryGlow }]}>
-                        <Ionicons name="camera-outline" size={22} color={Colors.primary} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.actionBtnTitle}>Snap & Track Meal</Text>
-                        <Text style={styles.actionBtnSub}>Take photo or scan food label via AI</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.actionRowBtn}
-                      onPress={() => handleQuickAction('+250ml Water')}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.actionIconBg, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-                        <Ionicons name="water-outline" size={22} color="#38BDF8" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.actionBtnTitle}>Log Water (250ml)</Text>
-                        <Text style={styles.actionBtnSub}>Add 1 glass towards daily target</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.actionRowBtn}
-                      onPress={() => handleQuickAction('Weight Log')}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[styles.actionIconBg, { backgroundColor: 'rgba(236, 72, 153, 0.15)' }]}>
-                        <Ionicons name="scale-outline" size={22} color="#EC4899" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.actionBtnTitle}>Log Weight Progress</Text>
-                        <Text style={styles.actionBtnSub}>Record today&apos;s morning weigh-in</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  <Text style={styles.cardTitle}>Log Exercise</Text>
+                  <Text style={styles.cardSub}>Workouts & burn</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={() => setIsPlusModalVisible(false)}
-                  activeOpacity={0.7}
+                  style={styles.gridCard}
+                  onPress={handleOpenWater}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.modalCloseBtnText}>Close</Text>
+                  <View
+                    style={[
+                      styles.cardIconBg,
+                      { backgroundColor: "rgba(56, 189, 248, 0.16)" },
+                    ]}
+                  >
+                    <Ionicons name="water-outline" size={26} color="#38BDF8" />
+                  </View>
+                  <Text style={styles.cardTitle}>Add drink water</Text>
+                  <Text style={styles.cardSub}>+250ml quick entry</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.gridCard}
+                  onPress={handleOpenFoodDb}
+                  activeOpacity={0.8}
+                >
+                  <View
+                    style={[
+                      styles.cardIconBg,
+                      { backgroundColor: "rgba(16, 185, 129, 0.16)" },
+                    ]}
+                  >
+                    <Ionicons name="search-outline" size={26} color="#10B981" />
+                  </View>
+                  <Text style={styles.cardTitle}>food database</Text>
+                  <Text style={styles.cardSub}>Search 100k+ foods</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.gridCard, styles.premiumGridCard]}
+                  onPress={handleScanFood}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.proBadge}>
+                    <Ionicons name="sparkles" size={10} color="#FFFFFF" />
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.cardIconBg,
+                      { backgroundColor: "rgba(139, 92, 246, 0.16)" },
+                    ]}
+                  >
+                    <Ionicons name="camera-outline" size={26} color="#8B5CF6" />
+                  </View>
+                  <Text style={styles.cardTitle}>scan food</Text>
+                  <Text style={styles.cardSub}>AI photo scanner</Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* Add Meal / Workout Log Modal */}
+      <AddLogModal
+        isVisible={isAddLogModalOpen}
+        initialType={logModalInitialType}
+        onClose={() => setIsAddLogModalOpen(false)}
+      />
     </>
   );
 }
@@ -203,19 +270,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: "Home",
         }}
       />
       <Tabs.Screen
         name="analytics"
         options={{
-          title: 'Analytics',
+          title: "Analytics",
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: "Profile",
         }}
       />
     </Tabs>
@@ -224,141 +291,170 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   floatingTabBarWrapper: {
-    position: 'absolute',
+    position: "absolute",
     left: 16,
     right: 16,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 99,
   },
   floatingTabBarCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(22, 22, 22, 0.95)',
-    borderRadius: 32,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.98)",
+    borderRadius: 36,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
     shadowRadius: 16,
-    elevation: 10,
-    width: '100%',
+    elevation: 8,
+    width: "100%",
     maxWidth: 440,
   },
   tabsRow: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    marginRight: 10,
   },
   tabItem: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "600",
     marginTop: 3,
   },
   activeDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.primary,
+    backgroundColor: "#111827",
     marginTop: 3,
   },
-  plusFloatingBtnCenter: {
-
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+  plusFloatingBtnRight: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#111827",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
-    marginBottom: -16,
-    zIndex: 10,
-    borderWidth: 3,
-    borderColor: Colors.background,
+    marginLeft: 8,
+    marginRight: -4,
+    marginVertical: -8,
   },
 
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
-  modalSheetCard: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    borderTopWidth: 1,
-    borderColor: Colors.cardBorder,
+  userStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  modalHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.cardBorder,
-    alignSelf: 'center',
-    marginBottom: 16,
+  userStatusFree: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "rgba(255, 255, 255, 0.25)",
   },
-  modalTitle: {
-    color: Colors.text,
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
+  userStatusPaid: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
   },
-  modalSubTitle: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 20,
+  userStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
-  modalActionsGrid: {
+
+  grid2x2Container: {
+    width: "100%",
+    maxWidth: 400,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 12,
-    marginBottom: 16,
+    paddingHorizontal: 0,
   },
-  actionRowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: 14,
-    borderRadius: 18,
+  gridCard: {
+    width: "48%",
+    backgroundColor: "rgba(255, 255, 255, 0.88)",
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  actionIconBg: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+  premiumGridCard: {
+    borderColor: "rgba(139, 92, 246, 0.22)",
+    backgroundColor: "rgba(243, 232, 255, 0.85)",
   },
-  actionBtnTitle: {
+  proBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#8B5CF6",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  proBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  cardIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  cardTitle: {
     color: Colors.text,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
+    marginBottom: 2,
   },
-  actionBtnSub: {
-    color: Colors.textMuted,
+  cardSub: {
+    color: Colors.textSecondary,
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: "400",
   },
+
   successAlertBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.successBg,
     borderColor: Colors.successBorder,
     borderWidth: 1,
@@ -369,20 +465,77 @@ const styles = StyleSheet.create({
   successAlertText: {
     color: Colors.success,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: "700",
   },
+
+  premiumAlertBox: {
+    backgroundColor: "#FAF5FF",
+    borderColor: "#DDD6FE",
+    borderWidth: 1,
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  premiumAlertHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  premiumAlertTitle: {
+    color: "#5B21B6",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  premiumAlertDesc: {
+    color: "#6D28D9",
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  premiumActionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  premiumBtnPrimary: {
+    flex: 1,
+    backgroundColor: "#8B5CF6",
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  premiumBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  premiumBtnSecondary: {
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  premiumBtnSecondaryText: {
+    color: "#7C3AED",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
   modalCloseBtn: {
-    backgroundColor: Colors.surface,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 16,
     height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   modalCloseBtnText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '700',
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

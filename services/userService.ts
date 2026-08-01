@@ -178,5 +178,69 @@ export const getUserOnboardingFromStorage = async (uid: string): Promise<Record<
   }
 };
 
+/**
+ * Update user primary calorie and macro targets in Firestore and local storage
+ */
+export const updateUserMacroTargets = async (
+  uid: string,
+  targets: {
+    dailyCalorieGoal: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    waterLiters?: number;
+  }
+): Promise<void> => {
+  if (!uid) return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    const updatePayload: Record<string, any> = {
+      dailyCalorieGoal: targets.dailyCalorieGoal,
+      macroGoals: {
+        protein: targets.protein,
+        carbs: targets.carbs,
+        fat: targets.fat,
+      },
+      updatedAt: serverTimestamp(),
+    };
+
+    if (targets.waterLiters !== undefined) {
+      updatePayload.waterGoal = {
+        liters: targets.waterLiters,
+        glasses: Math.round(targets.waterLiters * 4),
+      };
+    }
+
+    await setDoc(userRef, updatePayload, { merge: true });
+
+    // Sync local SecureStore / localStorage
+    const existingLocal = await getUserOnboardingFromStorage(uid);
+    const updatedLocal = {
+      ...(existingLocal || {}),
+      dailyCalorieGoal: targets.dailyCalorieGoal,
+      macroGoals: {
+        protein: targets.protein,
+        carbs: targets.carbs,
+        fat: targets.fat,
+      },
+      ...(targets.waterLiters !== undefined
+        ? {
+            waterGoal: {
+              liters: targets.waterLiters,
+              glasses: Math.round(targets.waterLiters * 4),
+            },
+          }
+        : {}),
+    };
+    await saveUserOnboardingToStorage(uid, updatedLocal);
+
+    console.log('✅ [Firebase] User target goals updated in Firestore and local storage:', uid);
+  } catch (error) {
+    console.error('❌ [Firebase] Error updating user targets:', error);
+    throw error;
+  }
+};
+
+
 
 
