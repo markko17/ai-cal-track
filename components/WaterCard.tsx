@@ -17,6 +17,8 @@ const EMPTY_GLASS = require('@/assets/images/empty_glass.png');
 export interface WaterCardProps {
   waterGoalLiters?: number;       // e.g. 3.0L
   consumedWaterLiters?: number;   // e.g. 1.5L
+  waterGoalMl?: number;
+  consumedWaterMl?: number;
   isLoading?: boolean;
   onEditPress?: () => void;
   onLogWaterPress?: () => void;
@@ -25,27 +27,35 @@ export interface WaterCardProps {
 export default function WaterCard({
   waterGoalLiters = 3.0,
   consumedWaterLiters = 0,
+  waterGoalMl,
+  consumedWaterMl,
   isLoading = false,
   onEditPress,
   onLogWaterPress,
 }: WaterCardProps) {
+  const consumedMl = consumedWaterMl !== undefined ? consumedWaterMl : Math.round(consumedWaterLiters * 1000);
+  const goalMl = waterGoalMl !== undefined ? waterGoalMl : Math.round(waterGoalLiters * 1000);
+
+  const goalLiters = goalMl / 1000;
+  const consumedLiters = consumedMl / 1000;
+
   // Single row max 9 glasses
   const maxGlassesInRow = 9;
-  const targetGlasses = Math.min(maxGlassesInRow, Math.max(1, Math.round(waterGoalLiters * 3)));
-  const glassVolumeLiters = waterGoalLiters > 0 ? waterGoalLiters / targetGlasses : 0.33;
-  const consumedGlassesCount = glassVolumeLiters > 0 ? consumedWaterLiters / glassVolumeLiters : 0;
+  const targetGlasses = Math.min(maxGlassesInRow, Math.max(1, Math.round(goalLiters * 3)));
+  const glassVolumeLiters = goalLiters > 0 ? goalLiters / targetGlasses : 0.33;
+  const consumedGlassesCount = glassVolumeLiters > 0 ? consumedLiters / glassVolumeLiters : 0;
 
-  const remainingLiters = Math.max(0, waterGoalLiters - consumedWaterLiters);
   const remainingGlasses = Math.max(0, targetGlasses - Math.floor(consumedGlassesCount));
+  const isGoalReached = consumedMl >= goalMl || remainingGlasses === 0;
 
   return (
     <View style={styles.cardContainer}>
-      {/* Top Header Row: "Water" on left, Edit icon on right */}
+      {/* Top Header Row: "Water" on left with subtitle stacked, green pencil icon on right */}
       <View style={styles.headerRow}>
-        <View style={styles.titleRow}>
+        <View style={styles.titleColumn}>
           <Text style={styles.cardTitle}>Water</Text>
           <Text style={styles.cardSubTitle}>
-            {consumedWaterLiters.toFixed(1)} / {waterGoalLiters.toFixed(1)} L
+            {consumedMl}ml / {goalMl}ml
           </Text>
         </View>
 
@@ -56,11 +66,11 @@ export default function WaterCard({
           accessibilityRole="button"
           accessibilityLabel="Edit water goal"
         >
-          <Ionicons name="create-outline" size={18} color={Colors.primary} />
+          <Ionicons name="pencil" size={20} color="#059669" />
         </TouchableOpacity>
       </View>
 
-      {/* Single Row Glasses Grid (Max 9 glasses in 1 row) */}
+      {/* Single Row Glasses Grid (Filled/Half glasses are large, Empty glasses are small) */}
       <View style={styles.gridWrapper}>
         {isLoading ? (
           <View style={styles.loadingBox}>
@@ -74,13 +84,16 @@ export default function WaterCard({
               const halfAmount = index + 0.5;
 
               let glassSource = EMPTY_GLASS;
+              let isFilled = false;
               let glassState = 'empty';
 
               if (consumedGlassesCount >= fullAmount) {
                 glassSource = FULL_GLASS;
+                isFilled = true;
                 glassState = 'full';
               } else if (consumedGlassesCount >= halfAmount) {
                 glassSource = HALF_GLASS;
+                isFilled = true;
                 glassState = 'half';
               }
 
@@ -92,7 +105,11 @@ export default function WaterCard({
                   activeOpacity={0.75}
                   accessibilityLabel={`Glass ${index + 1} ${glassState}`}
                 >
-                  <Image source={glassSource} style={styles.glassImage} resizeMode="contain" />
+                  <Image
+                    source={glassSource}
+                    style={isFilled ? styles.filledGlassImage : styles.emptyGlassImage}
+                    resizeMode="contain"
+                  />
                 </TouchableOpacity>
               );
             })}
@@ -100,24 +117,14 @@ export default function WaterCard({
         )}
       </View>
 
-      {/* Bottom Footer Inside Card: Water Left Info */}
-      <View style={styles.footerRow}>
-        <View style={styles.waterInfoBadge}>
-          <Ionicons name="water" size={16} color="#38BDF8" />
-          <Text style={styles.footerText}>
-            {remainingGlasses === 0
-              ? 'Goal Achieved! Stay hydrated 🎉'
-              : `${remainingGlasses} glass${remainingGlasses === 1 ? '' : 'es'} (${remainingLiters.toFixed(1)}L) left`}
-          </Text>
-        </View>
-
-        {onLogWaterPress && (
-          <TouchableOpacity style={styles.quickAddBtn} onPress={onLogWaterPress} activeOpacity={0.8}>
-            <Ionicons name="add" size={16} color="#38BDF8" />
-            <Text style={styles.quickAddText}>+1 Glass</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Bottom Center Info: Green "X glasses left" or "Goal Achieved!" */}
+      <TouchableOpacity onPress={onLogWaterPress} activeOpacity={0.8} disabled={isGoalReached}>
+        <Text style={styles.greenFooterText}>
+          {isGoalReached
+            ? 'Goal Achieved!'
+            : `${remainingGlasses} glass${remainingGlasses === 1 ? '' : 'es'} left`}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -133,24 +140,23 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
+  titleColumn: {
+    flexDirection: 'column',
+    gap: 2,
   },
   cardTitle: {
     color: Colors.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
   },
   cardSubTitle: {
     color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
   },
   editIconBtn: {
     width: 36,
@@ -163,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   gridWrapper: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   loadingBox: {
     height: 50,
@@ -179,54 +185,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'nowrap',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    height: 52,
+    paddingHorizontal: 4,
   },
   glassItem: {
     flex: 1,
-    height: 42,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  glassImage: {
-    width: 28,
-    height: 38,
+  filledGlassImage: {
+    width: 32,
+    height: 48,
   },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
+  emptyGlassImage: {
+    width: 18,
+    height: 28,
+    marginBottom: 4,
   },
-  waterInfoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  footerText: {
-    color: Colors.text,
-    fontSize: 13,
+  greenFooterText: {
+    color: '#059669',
+    fontSize: 15,
     fontWeight: '700',
-  },
-  quickAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.3)',
-  },
-  quickAddText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

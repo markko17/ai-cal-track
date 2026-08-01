@@ -41,7 +41,11 @@ export default function CalorieCard({
   const { width: windowWidth } = useWindowDimensions();
 
   const remainingCalories = Math.max(0, dailyCalorieGoal - consumedCalories + burnedCalories);
-  const progressRatio = dailyCalorieGoal > 0 ? Math.min(1, Math.max(0, (consumedCalories - burnedCalories) / dailyCalorieGoal)) : 0;
+  // The arc communicates food intake progress. Keep one segment visible at an
+  // empty state, then grow it with consumed calories.
+  const progressRatio = dailyCalorieGoal > 0
+    ? Math.min(1, Math.max(1 / 15, consumedCalories / dailyCalorieGoal))
+    : 0;
 
   const remainingCarbs = Math.max(0, carbsGoal - consumedCarbs);
   const remainingProtein = Math.max(0, proteinGoal - consumedProtein);
@@ -80,9 +84,9 @@ export default function CalorieCard({
           <SegmentedHalfCircleProgress30
             progress={progressRatio}
             size={arcSize}
-            strokeWidth={50}
+            strokeWidth={46}
             segments={15}
-            gapAngle={24}
+            gapAngle={4}
             value={remainingCalories}
             label="Remaining"
             showFlame={true}

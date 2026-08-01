@@ -21,7 +21,7 @@ export function SegmentedHalfCircleProgress30({
     size = 290,
     strokeWidth = 46,
     segments = 14,
-    gapAngle = 5,
+    gapAngle = 4,
     value,
     label = "Remaining",
     showFlame = true,
@@ -35,10 +35,12 @@ export function SegmentedHalfCircleProgress30({
     const cy = size / 2;
 
     const totalAngle = 180;
-    const effectiveGap = Math.min(gapAngle, totalAngle / Math.max(segments - 1, 1));
+    const maxTotalGap = totalAngle * 0.4;
+    const maxGapPerSegment = maxTotalGap / Math.max(segments - 1, 1);
+    const effectiveGap = Math.min(Math.max(0, gapAngle), maxGapPerSegment);
     const totalGap = effectiveGap * (segments - 1);
 
-    const segmentAngle = (totalAngle - totalGap) / segments;
+    const segmentAngle = (totalAngle - totalGap) / Math.max(segments, 1);
 
     const activeSegments = Math.round(clamped * segments);
 
@@ -56,15 +58,16 @@ export function SegmentedHalfCircleProgress30({
 
         return `
       M ${start.x} ${start.y}
-      A ${radius} ${radius} 0 0 0 ${end.x} ${end.y}
+      A ${radius} ${radius} 0 0 1 ${end.x} ${end.y}
     `;
     };
 
     let currentAngle = 180;
+    const svgHeight = size / 2 + strokeWidth / 2 + 4;
 
     return (
-        <View style={{ width: size, height: size / 2 + 15, alignItems: 'center', justifyContent: 'flex-end' }}>
-            <Svg width={size} height={size / 2 + 4}>
+        <View style={{ width: size, height: svgHeight, alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Svg width={size} height={svgHeight}>
                 {Array.from({ length: segments }).map((_, i) => {
                     const start = currentAngle;
                     const end = currentAngle - segmentAngle;
@@ -98,7 +101,7 @@ export default SegmentedHalfCircleProgress30;
 const styles = StyleSheet.create({
     textOverlay: {
         position: 'absolute',
-        bottom: 4,
+        bottom: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
