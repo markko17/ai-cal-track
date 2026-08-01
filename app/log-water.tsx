@@ -2,7 +2,7 @@ import Colors from '@/constants/colors';
 import { addWaterLogToFirestore, formatDateKey } from '@/services/dailyLogService';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -23,6 +23,7 @@ const FULL_GLASS = require('@/assets/images/full_glass.png');
 export default function LogWaterScreen() {
   const router = useRouter();
   const { user } = useUser();
+  const { date } = useLocalSearchParams<{ date?: string }>();
 
   // Each step represents half a glass (125 ml). Range: 0 to 8 half glasses (0 ml to 1000 ml / 4 full glasses)
   const [halfGlassesCount, setHalfGlassesCount] = useState(0);
@@ -59,9 +60,9 @@ export default function LogWaterScreen() {
     try {
       setIsSubmitting(true);
       const totalLiters = Number((totalMl / 1000).toFixed(3));
-      const todayStr = formatDateKey(new Date());
+      const targetDate = date || formatDateKey(new Date());
 
-      await addWaterLogToFirestore(user.id, todayStr, totalLiters);
+      await addWaterLogToFirestore(user.id, targetDate, totalLiters);
       router.back();
     } catch (error) {
       console.error('Error logging water intake:', error);

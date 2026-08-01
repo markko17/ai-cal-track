@@ -131,7 +131,10 @@ export default function HomeTabScreen() {
   };
 
   const handleLogWater = () => {
-    router.push('/log-water' as any);
+    router.push({
+      pathname: '/log-water',
+      params: { date: formatDateKey(selectedDate) },
+    } as any);
   };
 
   return (
