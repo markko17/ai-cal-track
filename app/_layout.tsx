@@ -39,7 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack>
       <ClerkLoaded>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
       </ClerkLoaded>
     </ClerkProvider>
   );

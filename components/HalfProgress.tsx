@@ -35,7 +35,8 @@ export function SegmentedHalfCircleProgress30({
     const cy = size / 2;
 
     const totalAngle = 180;
-    const totalGap = gapAngle * (segments - 1);
+    const effectiveGap = Math.min(gapAngle, totalAngle / Math.max(segments - 1, 1));
+    const totalGap = effectiveGap * (segments - 1);
 
     const segmentAngle = (totalAngle - totalGap) / segments;
 
@@ -67,7 +68,7 @@ export function SegmentedHalfCircleProgress30({
                 {Array.from({ length: segments }).map((_, i) => {
                     const start = currentAngle;
                     const end = currentAngle - segmentAngle;
-                    currentAngle = end - gapAngle;
+                    currentAngle = end - effectiveGap;
 
                     const isActive = i < activeSegments;
 

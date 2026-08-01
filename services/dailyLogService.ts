@@ -1,6 +1,5 @@
-import * as SecureStore from 'expo-secure-store';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 
 export interface LogEntry {
@@ -18,7 +17,7 @@ export interface LogEntry {
 }
 
 export interface DailyLogData {
-  date: string; // YYYY-MM-DD
+  date: string;
   consumedCalories: number;
   burnedCalories: number;
   consumedProtein: number;
@@ -29,9 +28,6 @@ export interface DailyLogData {
   updatedAt?: any;
 }
 
-/**
- * Format a Date object as YYYY-MM-DD
- */
 export const formatDateKey = (date: Date): string => {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -39,217 +35,60 @@ export const formatDateKey = (date: Date): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-/**
- * Helper to safely get local SecureStore key
- */
 const getStorageKey = (userId: string, dateStr: string) => `daily_log_${userId}_${dateStr}`;
+const defaultLog = (date: string): DailyLogData => ({ date, consumedCalories: 0, burnedCalories: 0, consumedProtein: 0, consumedCarbs: 0, consumedFat: 0, consumedWaterLiters: 0, entries: [] });
+const normalize = (date: string, data?: Partial<DailyLogData>): DailyLogData => ({ ...defaultLog(date), ...data, entries: data?.entries || [] });
+const cacheLog = async (userId: string, date: string, log: DailyLogData) => {
+  try { await AsyncStorage.setItem(getStorageKey(userId, date), JSON.stringify({ ...log, updatedAt: new Date().toISOString() })); } catch (error) { console.warn('Daily log cache save error:', error); }
+};
+const readCachedLog = async (userId: string, date: string) => {
+  try { const cached = await AsyncStorage.getItem(getStorageKey(userId, date)); return cached ? normalize(date, JSON.parse(cached)) : null; } catch (error) { console.warn('Daily log cache read error:', error); return null; }
+};
 
-/**
- * Fetch daily log for a specific user and date (YYYY-MM-DD) from Firestore,
- * falling back to local cache if offline.
- */
-export const getDailyLogByDate = async (
-  userId: string,
-  dateStr: string
-): Promise<DailyLogData> => {
-  const defaultLog: DailyLogData = {
-    date: dateStr,
-    consumedCalories: 0,
-    burnedCalories: 0,
-    consumedProtein: 0,
-    consumedCarbs: 0,
-    consumedFat: 0,
-    consumedWaterLiters: 0,
-    entries: [],
-  };
-
-  if (!userId || !dateStr) return defaultLog;
-
+export const getDailyLogByDate = async (userId: string, dateStr: string): Promise<DailyLogData> => {
+  const fallback = defaultLog(dateStr);
+  if (!userId || !dateStr) return fallback;
   try {
-    const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
-    const logSnap = await getDoc(logRef);
-
-    if (logSnap.exists()) {
-      const data = logSnap.data() as DailyLogData;
-      const resultLog: DailyLogData = {
-        date: dateStr,
-        consumedCalories: data.consumedCalories || 0,
-        burnedCalories: data.burnedCalories || 0,
-        consumedProtein: data.consumedProtein || 0,
-        consumedCarbs: data.consumedCarbs || 0,
-        consumedFat: data.consumedFat || 0,
-        consumedWaterLiters: data.consumedWaterLiters || 0,
-        entries: data.entries || [],
-      };
-
-      // Cache locally
-      if (Platform.OS !== 'web') {
-        try {
-          await SecureStore.setItemAsync(getStorageKey(userId, dateStr), JSON.stringify(resultLog));
-        } catch (storeErr) {
-          console.warn('SecureStore save error:', storeErr);
-        }
-      }
-
-      return resultLog;
-    } else {
-      // Check local cache if doc doesn't exist on server
-      if (Platform.OS !== 'web') {
-        try {
-          const cached = await SecureStore.getItemAsync(getStorageKey(userId, dateStr));
-          if (cached) {
-            return JSON.parse(cached);
-          }
-        } catch (cacheErr) {
-          console.warn('SecureStore read error:', cacheErr);
-        }
-      }
-      return defaultLog;
-    }
+    const snapshot = await getDoc(doc(db, 'users', userId, 'dailyLogs', dateStr));
+    if (!snapshot.exists()) return (await readCachedLog(userId, dateStr)) || fallback;
+    const result = normalize(dateStr, snapshot.data() as Partial<DailyLogData>);
+    await cacheLog(userId, dateStr, result);
+    return result;
   } catch (error) {
-    console.error('❌ [Firebase] Error fetching daily log:', error);
-    // Fallback to local cache on error
-    if (Platform.OS !== 'web') {
-      try {
-        const cached = await SecureStore.getItemAsync(getStorageKey(userId, dateStr));
-        if (cached) return JSON.parse(cached);
-      } catch {}
-    }
-    return defaultLog;
+    console.error('Daily log fetch error:', error);
+    return (await readCachedLog(userId, dateStr)) || fallback;
   }
 };
 
-/**
- * Add a new meal or workout entry to a specific date's daily log in Firestore.
- */
-export const addLogEntryToFirestore = async (
-  userId: string,
-  dateStr: string,
-  entryData: {
-    type: 'meal' | 'workout';
-    title: string;
-    calories: number;
-    protein?: number;
-    carbs?: number;
-    fat?: number;
-    exerciseType?: string;
-    intensity?: 'low' | 'medium' | 'high';
-    durationMinutes?: number;
-  }
-): Promise<DailyLogData> => {
-  if (!userId || !dateStr) {
-    throw new Error('User ID and date string are required');
-  }
-
+export const addLogEntryToFirestore = async (userId: string, dateStr: string, entryData: Omit<LogEntry, 'id' | 'createdAt'>): Promise<DailyLogData> => {
+  if (!userId || !dateStr) throw new Error('User ID and date string are required');
+  const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
   try {
-    // 1. Get existing log
-    const currentLog = await getDailyLogByDate(userId, dateStr);
-
-    // 2. Create new entry object
-    const newEntry: LogEntry = {
-      id: Date.now().toString(),
-      type: entryData.type,
-      title: entryData.title.trim(),
-      calories: Number(entryData.calories) || 0,
-      protein: Number(entryData.protein) || 0,
-      carbs: Number(entryData.carbs) || 0,
-      fat: Number(entryData.fat) || 0,
-      exerciseType: entryData.exerciseType,
-      intensity: entryData.intensity,
-      durationMinutes: entryData.durationMinutes,
-      createdAt: new Date().toISOString(),
-    };
-
-    // 3. Compute updated totals
-    const updatedEntries = [newEntry, ...currentLog.entries];
-
-    let newConsumedCalories = currentLog.consumedCalories;
-    let newBurnedCalories = currentLog.burnedCalories;
-    let newConsumedProtein = currentLog.consumedProtein;
-    let newConsumedCarbs = currentLog.consumedCarbs;
-    let newConsumedFat = currentLog.consumedFat;
-
-    if (newEntry.type === 'meal') {
-      newConsumedCalories += newEntry.calories;
-      newConsumedProtein += newEntry.protein || 0;
-      newConsumedCarbs += newEntry.carbs || 0;
-      newConsumedFat += newEntry.fat || 0;
-    } else {
-      newBurnedCalories += newEntry.calories;
-    }
-
-    const updatedLog: DailyLogData = {
-      date: dateStr,
-      consumedCalories: newConsumedCalories,
-      burnedCalories: newBurnedCalories,
-      consumedProtein: newConsumedProtein,
-      consumedCarbs: newConsumedCarbs,
-      consumedFat: newConsumedFat,
-      consumedWaterLiters: currentLog.consumedWaterLiters || 0,
-      entries: updatedEntries,
-      updatedAt: serverTimestamp(),
-    };
-
-    // 4. Save to Firestore
-    const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
-    await setDoc(logRef, updatedLog, { merge: true });
-
-    // 5. Cache locally
-    if (Platform.OS !== 'web') {
-      try {
-        await SecureStore.setItemAsync(getStorageKey(userId, dateStr), JSON.stringify({
-          ...updatedLog,
-          updatedAt: new Date().toISOString(),
-        }));
-      } catch {}
-    }
-
-    console.log(`🔥 [Firebase] Added ${entryData.type} entry to log for ${dateStr}:`, newEntry.title);
-    return updatedLog;
-  } catch (error) {
-    console.error('❌ [Firebase] Error adding log entry:', error);
-    throw error;
-  }
+    const updated = await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(logRef);
+      const current = normalize(dateStr, snapshot.exists() ? snapshot.data() as Partial<DailyLogData> : undefined);
+      const entry: LogEntry = { ...entryData, id: doc(collection(db, '_')).id, title: entryData.title.trim(), calories: Number(entryData.calories) || 0, protein: Number(entryData.protein) || 0, carbs: Number(entryData.carbs) || 0, fat: Number(entryData.fat) || 0, createdAt: new Date().toISOString() };
+      const next: DailyLogData = { ...current, entries: [entry, ...current.entries], consumedCalories: current.consumedCalories + (entry.type === 'meal' ? entry.calories : 0), burnedCalories: current.burnedCalories + (entry.type === 'workout' ? entry.calories : 0), consumedProtein: current.consumedProtein + (entry.type === 'meal' ? entry.protein || 0 : 0), consumedCarbs: current.consumedCarbs + (entry.type === 'meal' ? entry.carbs || 0 : 0), consumedFat: current.consumedFat + (entry.type === 'meal' ? entry.fat || 0 : 0), updatedAt: serverTimestamp() };
+      transaction.set(logRef, next, { merge: true });
+      return next;
+    });
+    await cacheLog(userId, dateStr, updated);
+    return updated;
+  } catch (error) { console.error('Daily log write error:', error); throw error; }
 };
 
-/**
- * Add water log in Liters (default 0.25L = 1 glass of 250ml) to a specific date's log
- */
-export const addWaterLogToFirestore = async (
-  userId: string,
-  dateStr: string,
-  addedLiters: number = 0.25
-): Promise<DailyLogData> => {
-  if (!userId || !dateStr) {
-    throw new Error('User ID and date string are required');
-  }
-
+export const addWaterLogToFirestore = async (userId: string, dateStr: string, addedLiters = 0.25): Promise<DailyLogData> => {
+  if (!userId || !dateStr) throw new Error('User ID and date string are required');
+  const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
   try {
-    const currentLog = await getDailyLogByDate(userId, dateStr);
-    const updatedWater = Number((currentLog.consumedWaterLiters + addedLiters).toFixed(2));
-
-    const updatedLog: DailyLogData = {
-      ...currentLog,
-      consumedWaterLiters: updatedWater,
-      updatedAt: serverTimestamp(),
-    };
-
-    const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
-    await setDoc(logRef, updatedLog, { merge: true });
-
-    if (Platform.OS !== 'web') {
-      try {
-        await SecureStore.setItemAsync(getStorageKey(userId, dateStr), JSON.stringify({
-          ...updatedLog,
-          updatedAt: new Date().toISOString(),
-        }));
-      } catch {}
-    }
-
-    console.log(`💧 [Firebase] Logged +${addedLiters}L water for ${dateStr}. Total: ${updatedWater}L`);
-    return updatedLog;
-  } catch (error) {
-    console.error('❌ [Firebase] Error adding water log entry:', error);
-    throw error;
-  }
+    const updated = await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(logRef);
+      const current = normalize(dateStr, snapshot.exists() ? snapshot.data() as Partial<DailyLogData> : undefined);
+      const next: DailyLogData = { ...current, consumedWaterLiters: Number((current.consumedWaterLiters + addedLiters).toFixed(2)), updatedAt: serverTimestamp() };
+      transaction.set(logRef, next, { merge: true });
+      return next;
+    });
+    await cacheLog(userId, dateStr, updated);
+    return updated;
+  } catch (error) { console.error('Water log write error:', error); throw error; }
 };

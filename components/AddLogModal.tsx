@@ -73,6 +73,7 @@ export default function AddLogModal({
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     if (!title.trim()) {
       Alert.alert('Missing Name', 'Please enter a name for this entry (e.g. Oatmeal with Protein).');
       return;
@@ -207,9 +208,6 @@ export default function AddLogModal({
                 value={calories}
                 onChangeText={(t) => {
                   setCalories(t);
-                  if (t.length >= 4 && logType === 'meal') {
-                    proteinRef.current?.focus();
-                  }
                 }}
                 returnKeyType={logType === 'meal' ? 'next' : 'done'}
                 onSubmitEditing={() => {
@@ -238,9 +236,6 @@ export default function AddLogModal({
                     value={protein}
                     onChangeText={(t) => {
                       setProtein(t);
-                      if (t.length >= 3) {
-                        carbsRef.current?.focus();
-                      }
                     }}
                     returnKeyType="next"
                     onSubmitEditing={() => carbsRef.current?.focus()}
@@ -260,9 +255,6 @@ export default function AddLogModal({
                     value={carbs}
                     onChangeText={(t) => {
                       setCarbs(t);
-                      if (t.length >= 3) {
-                        fatRef.current?.focus();
-                      }
                     }}
                     returnKeyType="next"
                     onSubmitEditing={() => fatRef.current?.focus()}
