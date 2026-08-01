@@ -41,15 +41,9 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     router.push("/log-exercise" as any);
   };
 
-  const handleOpenWater = async () => {
-    if (user?.id) {
-      try {
-        await addWaterLogToFirestore(user.id, formatDateKey(new Date()), 0.25);
-      } catch (err) {
-        console.error("Error logging water from quick actions:", err);
-      }
-    }
+  const handleOpenWater = () => {
     closePlusModal();
+    router.push("/log-water" as any);
   };
 
   const handleOpenFoodDb = () => {

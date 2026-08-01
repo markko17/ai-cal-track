@@ -130,14 +130,8 @@ export default function HomeTabScreen() {
     setIsEditTargetsModalVisible(true);
   };
 
-  const handleLogWater = async () => {
-    if (!user?.id) return;
-    try {
-      await addWaterLogToFirestore(user.id, formatDateKey(selectedDate), 0.25);
-      fetchDateLog();
-    } catch (err) {
-      console.error('Error logging water:', err);
-    }
+  const handleLogWater = () => {
+    router.push('/log-water' as any);
   };
 
   return (
