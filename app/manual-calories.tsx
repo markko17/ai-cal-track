@@ -63,6 +63,11 @@ export default function ManualCaloriesScreen() {
         carbs: logType === 'meal' ? Number(carbs) || 0 : 0,
         fat: logType === 'meal' ? Number(fat) || 0 : 0,
       });
+      setTitle('');
+      setCalories('');
+      setProtein('');
+      setCarbs('');
+      setFat('');
 
       Alert.alert(
         'Logged Successfully!',
