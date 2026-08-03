@@ -48,8 +48,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
   const handleOpenFoodDb = () => {
     closePlusModal();
-    setLogModalInitialType("meal");
-    setIsAddLogModalOpen(true);
+    router.push("/food-database" as any);
   };
 
   const handleScanFood = () => {

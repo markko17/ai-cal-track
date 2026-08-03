@@ -10,6 +10,9 @@ export interface LogEntry {
   protein?: number;
   carbs?: number;
   fat?: number;
+  servingSize?: string;
+  foodIcon?: string;
+  imageUrl?: string;
   exerciseType?: string;
   intensity?: 'low' | 'medium' | 'high';
   durationMinutes?: number;
@@ -68,7 +71,16 @@ export const addLogEntryToFirestore = async (userId: string, dateStr: string, en
       const snapshot = await transaction.get(logRef);
       const current = normalize(dateStr, snapshot.exists() ? snapshot.data() as Partial<DailyLogData> : undefined);
       const entry: LogEntry = { ...entryData, id: doc(collection(db, '_')).id, title: entryData.title.trim(), calories: Number(entryData.calories) || 0, protein: Number(entryData.protein) || 0, carbs: Number(entryData.carbs) || 0, fat: Number(entryData.fat) || 0, createdAt: new Date().toISOString() };
-      const next: DailyLogData = { ...current, entries: [entry, ...current.entries], consumedCalories: current.consumedCalories + (entry.type === 'meal' ? entry.calories : 0), burnedCalories: current.burnedCalories + (entry.type === 'workout' ? entry.calories : 0), consumedProtein: current.consumedProtein + (entry.type === 'meal' ? entry.protein || 0 : 0), consumedCarbs: current.consumedCarbs + (entry.type === 'meal' ? entry.carbs || 0 : 0), consumedFat: current.consumedFat + (entry.type === 'meal' ? entry.fat || 0 : 0), updatedAt: serverTimestamp() };
+      const next: DailyLogData = {
+        ...current,
+        entries: [entry, ...current.entries],
+        consumedCalories: current.consumedCalories + (entry.type === 'meal' ? entry.calories : 0),
+        burnedCalories: current.burnedCalories + (entry.type === 'workout' ? entry.calories : 0),
+        consumedProtein: Number((current.consumedProtein + (entry.type === 'meal' ? entry.protein || 0 : 0)).toFixed(2)),
+        consumedCarbs: Number((current.consumedCarbs + (entry.type === 'meal' ? entry.carbs || 0 : 0)).toFixed(2)),
+        consumedFat: Number((current.consumedFat + (entry.type === 'meal' ? entry.fat || 0 : 0)).toFixed(2)),
+        updatedAt: serverTimestamp(),
+      };
       transaction.set(logRef, next, { merge: true });
       return next;
     });

@@ -196,6 +196,12 @@ export default function HomeTabScreen() {
                 calories={entry.calories}
                 type={entry.type}
                 time={getLogTime(entry.createdAt)}
+                servingSize={entry.servingSize}
+                foodIcon={entry.foodIcon}
+                imageUrl={entry.imageUrl}
+                protein={entry.protein}
+                carbs={entry.carbs}
+                fat={entry.fat}
                 {...workoutMetadata}
               />
             );

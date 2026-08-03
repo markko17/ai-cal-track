@@ -99,6 +99,7 @@ export default function AddLogModal({
         protein: logType === 'meal' ? Number(protein) || 0 : 0,
         carbs: logType === 'meal' ? Number(carbs) || 0 : 0,
         fat: logType === 'meal' ? Number(fat) || 0 : 0,
+        servingSize: logType === 'meal' ? '1 serving' : undefined,
       });
 
       Alert.alert(
