@@ -1,4 +1,4 @@
-import AddLogModal from "@/components/AddLogModal";
+import ScanFoodModal from "@/components/ScanFoodModal";
 import Colors from "@/constants/colors";
 import {
   addWaterLogToFirestore,
@@ -26,10 +26,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isPlusModalVisible, setIsPlusModalVisible] = useState(false);
-  const [isAddLogModalOpen, setIsAddLogModalOpen] = useState(false);
-  const [logModalInitialType, setLogModalInitialType] = useState<
-    "meal" | "workout"
-  >("meal");
+  const [isScanModalVisible, setIsScanModalVisible] = useState(false);
   const [isPaidUser, setIsPaidUser] = useState(false); // Mock paid status toggle
 
   const closePlusModal = useCallback(() => {
@@ -52,17 +49,8 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   };
 
   const handleScanFood = () => {
-    if (!isPaidUser) {
-      Alert.alert("PRO Feature", "Scan food requires PRO access.");
-      return;
-    }
-
     closePlusModal();
-    Alert.alert(
-      "📷 AI Food Scanner",
-      "Point your camera at your meal or barcode to auto-detect calories & macros.",
-      [{ text: "Start Scan (Mock)", onPress: () => {} }],
-    );
+    setIsScanModalVisible(true);
   };
 
   const bottomMargin = Platform.OS === "ios" ? Math.max(insets.bottom, 16) : 16;
@@ -242,11 +230,9 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Add Meal / Workout Log Modal */}
-      <AddLogModal
-        isVisible={isAddLogModalOpen}
-        initialType={logModalInitialType}
-        onClose={() => setIsAddLogModalOpen(false)}
+      <ScanFoodModal
+        isVisible={isScanModalVisible}
+        onClose={() => setIsScanModalVisible(false)}
       />
     </>
   );

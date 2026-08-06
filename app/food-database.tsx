@@ -1,9 +1,7 @@
-import Colors from '@/constants/colors';
 import {
   FatSecretFoodItem,
   searchFatSecretFoods,
 } from '@/services/fatsecretService';
-import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';

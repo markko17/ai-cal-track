@@ -42,6 +42,7 @@ export default function LogFoodDetailScreen() {
   const baseFat = Number(params.fat) || 0;
 
   // Form states
+  const [editableFoodName, setEditableFoodName] = useState(foodName);
   const [quantity, setQuantity] = useState('1');
   const [servingDescription, setServingDescription] = useState(baseServingUnit);
   const [calories, setCalories] = useState(String(baseCalories));
@@ -92,8 +93,8 @@ export default function LogFoodDetailScreen() {
       const qtyNum = parseFloat(quantity) || 1;
       const logTitle =
         qtyNum !== 1
-          ? `${foodName.trim()} (${qtyNum}x - ${servingDescription})`
-          : `${foodName.trim()} (${servingDescription})`;
+          ? `${editableFoodName.trim()} (${qtyNum}x - ${servingDescription})`
+          : `${editableFoodName.trim()} (${servingDescription})`;
 
       const servingStr =
         qtyNum !== 1
@@ -102,7 +103,7 @@ export default function LogFoodDetailScreen() {
 
       await addLogEntryToFirestore(user.id, todayStr, {
         type: 'meal',
-        title: foodName.trim(),
+        title: editableFoodName.trim(),
         calories: calNum,
         protein: Number(protein) || 0,
         carbs: Number(carbs) || 0,
@@ -165,7 +166,13 @@ export default function LogFoodDetailScreen() {
                   <Text style={styles.verifiedBadgeText}>Verified Nutrition</Text>
                 </View>
 
-                <Text style={styles.foodTitle}>{foodName}</Text>
+                <TextInput
+                  style={styles.foodTitleInput}
+                  value={editableFoodName}
+                  onChangeText={setEditableFoodName}
+                  placeholder="Food name"
+                  placeholderTextColor={Colors.textMuted}
+                />
 
                 <View style={styles.baseServingTag}>
                   <Ionicons name="restaurant-outline" size={14} color="#64748B" />
@@ -504,6 +511,16 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     letterSpacing: -0.5,
     marginBottom: 8,
+  },
+  foodTitleInput: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 32,
+    letterSpacing: -0.5,
+    marginBottom: 8,
+    padding: 0,
+    alignSelf: 'flex-start',
   },
   baseServingTag: {
     flexDirection: 'row',

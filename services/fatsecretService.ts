@@ -190,19 +190,27 @@ export async function searchFatSecretFoods(query: string): Promise<FatSecretFood
     return getFallbackFoodResults(trimmedQuery);
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
     const searchUrl = `https://platform.fatsecret.com/rest/server.api?method=foods.search&search_expression=${encodeURIComponent(
       trimmedQuery
-    )}&format=json&max_results=5`;
+    )}&format=json&max_results=20`;
 
     const response = await fetch(searchUrl, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        tokenCache = null;
+      }
       console.warn('FatSecret foods.search HTTP error:', response.status);
       return getFallbackFoodResults(trimmedQuery);
     }
@@ -224,10 +232,11 @@ export async function searchFatSecretFoods(query: string): Promise<FatSecretFood
     const rawFoods = data.foods.food;
     const foodArray = Array.isArray(rawFoods) ? rawFoods : [rawFoods];
 
-    // Get top 5 results & parse
-    const parsed = foodArray.slice(0, 5).map(parseFoodDescription);
+    // Get top 20 results & parse
+    const parsed = foodArray.slice(0, 20).map(parseFoodDescription);
     return parsed.length > 0 ? parsed : getFallbackFoodResults(trimmedQuery);
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error('Error fetching foods from FatSecret API:', error);
     return getFallbackFoodResults(trimmedQuery);
   }
@@ -443,5 +452,5 @@ function getFallbackFoodResults(query: string): FatSecretFoodItem[] {
     item.food_name.toLowerCase().includes(q)
   );
 
-  return filtered.length > 0 ? filtered.slice(0, 5) : mockDatabase.slice(0, 5);
+  return filtered.slice(0, 20);
 }

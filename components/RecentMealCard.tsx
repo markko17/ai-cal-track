@@ -1,4 +1,3 @@
-import Colors from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
@@ -91,8 +90,8 @@ export default function RecentMealCard({
   if (!isWorkout) {
     const iconConfig = getFoodIconConfig(cleanTitle);
     const hasMacros = (protein !== undefined && protein > 0) ||
-                      (carbs !== undefined && carbs > 0) ||
-                      (fat !== undefined && fat > 0);
+      (carbs !== undefined && carbs > 0) ||
+      (fat !== undefined && fat > 0);
 
     return (
       <View style={styles.cardContainer}>
@@ -156,8 +155,8 @@ export default function RecentMealCard({
   const displayWorkoutTitle = isWeightWorkout
     ? 'Weight Lifting'
     : isCardio
-    ? 'Cardio'
-    : cleanTitle;
+      ? 'Cardio'
+      : cleanTitle;
   const workoutColor = isWeightWorkout ? '#18B8AC' : '#F2717F';
   const workoutBackground = isWeightWorkout ? '#E4F9F6' : '#FFE9EC';
   const workoutIcon = isWeightWorkout ? 'barbell-outline' : 'footsteps-outline';
