@@ -26,69 +26,25 @@ interface CachedToken {
 
 let tokenCache: CachedToken | null = null;
 
-// Standard pure JS base64 encoder for universal React Native / Web compatibility
-function toBase64(str: string): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let output = '';
-  let i = 0;
-  while (i < str.length) {
-    const chr1 = str.charCodeAt(i++);
-    const chr2 = str.charCodeAt(i++);
-    const chr3 = str.charCodeAt(i++);
-
-    const enc1 = chr1 >> 2;
-    const enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
-    let enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
-    let enc4 = chr3 & 63;
-
-    if (isNaN(chr2)) {
-      enc3 = enc4 = 64;
-    } else if (isNaN(chr3)) {
-      enc4 = 64;
-    }
-
-    output += chars.charAt(enc1) + chars.charAt(enc2) + chars.charAt(enc3) + chars.charAt(enc4);
-  }
-  return output;
-}
-
 /**
- * Retrieves OAuth 2.0 access token from FatSecret.
+ * Retrieves OAuth 2.0 access token from FatSecret via the server proxy route.
  * Access token is valid for 24 hours (86400s).
  * Automatically generates a new token before expiration.
  */
 export async function getFatSecretAccessToken(): Promise<string | null> {
-  const clientId = (process.env.EXPO_PUBLIC_FATSECRET_CLIENT_ID || '').trim();
-  const clientSecret = (process.env.EXPO_PUBLIC_FATSECRET_CLIENT_SECRET || '').trim();
+  const now = Date.now();
 
   // Check if we have a valid cached token (with a 5-minute safety margin before 24h expiration)
-  const now = Date.now();
   if (tokenCache && now < tokenCache.expiresAt - 5 * 60 * 1000) {
     return tokenCache.accessToken;
   }
 
-  // If no credentials supplied or placeholders present
-  if (!clientId || !clientSecret || clientId === 'your_fatsecret_client_id_here') {
-    console.warn('FatSecret API: EXPO_PUBLIC_FATSECRET_CLIENT_ID/SECRET not configured.');
-    return null;
-  }
-
   try {
-    const tokenUrl = 'https://oauth.fatsecret.com/connect/token';
-    const authHeader = `Basic ${toBase64(`${clientId}:${clientSecret}`)}`;
-
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': authHeader,
-      },
-      body: 'grant_type=client_credentials&scope=basic',
-    });
+    const response = await fetch('/api/fatsecret-token');
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('FatSecret OAuth Token Error:', response.status, errorText);
+      console.error('FatSecret token proxy error:', response.status, errorText);
       return null;
     }
 
