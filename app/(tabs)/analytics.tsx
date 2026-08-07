@@ -4,7 +4,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -34,67 +34,92 @@ export default function AnalyticsTabScreen() {
   const [currentStreak, setCurrentStreak] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchAnalyticsData();
+    const userId = user?.id;
+    const requestId = ++requestIdRef.current;
+
+    if (!userId) {
+      setUserWeight('--');
+      setWeekStreak([]);
+      setCurrentStreak(0);
+      setIsLoading(false);
+      return;
     }
+
+    setIsLoading(true);
+    fetchAnalyticsData(userId, requestId);
+
+    return () => {
+      if (requestIdRef.current === requestId) {
+        requestIdRef.current += 1;
+      }
+    };
   }, [user?.id]);
 
-  const fetchAnalyticsData = async () => {
-    if (!user?.id) return;
-    setIsLoading(true);
+  const fetchAnalyticsData = async (userId: string, requestId: number) => {
     try {
-      const userResult = await getUserFromFirestore(user.id);
+      const userResult = await getUserFromFirestore(userId);
+      if (requestId !== requestIdRef.current) return;
       if (userResult.exists && userResult.data?.weight) {
         setUserWeight(userResult.data.weight);
       }
-      await fetchWeekStreak();
+      await fetchWeekStreak(userId, requestId);
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Error fetching analytics data:', error);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const fetchWeekStreak = async () => {
-    if (!user?.id) return;
+  const fetchWeekStreak = async (userId: string, requestId: number) => {
     const today = new Date();
     const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay() + 1);
+    const dayOfWeek = today.getDay();
+    startOfWeek.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
     startOfWeek.setHours(0, 0, 0, 0);
 
+    const currentDayIndex = (today.getDay() + 6) % 7;
     const streakData: WeekStreakData[] = [];
-    let streakCount = 0;
 
     for (let i = 0; i < 7; i++) {
       const dayDate = new Date(startOfWeek);
       dayDate.setDate(startOfWeek.getDate() + i);
       const dateStr = dateKey(dayDate);
-      const hasActivity = await checkDayActivity(user.id, dateStr);
+      const hasActivity = await checkDayActivity(userId, dateStr);
+      if (requestId !== requestIdRef.current) return;
       streakData.push({ dayIndex: i, hasActivity });
-      if (hasActivity && i <= (today.getDay() + 6) % 7) {
+    }
+
+    let streakCount = 0;
+    const lastEligibleDay = streakData[currentDayIndex]?.hasActivity
+      ? currentDayIndex
+      : currentDayIndex - 1;
+    for (let i = lastEligibleDay; i >= 0; i--) {
+      if (streakData[i]?.hasActivity) {
         streakCount++;
+      } else {
+        break;
       }
     }
 
+    if (requestId !== requestIdRef.current) return;
     setWeekStreak(streakData);
     setCurrentStreak(streakCount);
   };
 
   const checkDayActivity = async (userId: string, dateStr: string): Promise<boolean> => {
-    try {
-      const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
-      const snapshot = await getDoc(logRef);
-      if (!snapshot.exists()) return false;
-      const data = snapshot.data();
-      const entries = data?.entries || [];
-      const hasWaterLog = (data?.consumedWaterLiters || 0) > 0;
-      return entries.length > 0 || hasWaterLog;
-    } catch (error) {
-      console.error('Error checking day activity:', error);
-      return false;
-    }
+    const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
+    const snapshot = await getDoc(logRef);
+    if (!snapshot.exists()) return false;
+    const data = snapshot.data();
+    const entries = data?.entries || [];
+    const hasWaterLog = (data?.consumedWaterLiters || 0) > 0;
+    return entries.length > 0 || hasWaterLog;
   };
 
   const dateKey = (date: Date): string => {
