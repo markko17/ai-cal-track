@@ -1,9 +1,17 @@
 export async function GET() {
   try {
     const clientId = process.env.EXPO_PUBLIC_FATSECRET_CLIENT_ID || '';
-    const clientSecret = process.env.FATSECRET_CLIENT_SECRET || '';
+    const clientSecret =
+      process.env.FATSECRET_CLIENT_SECRET ||
+      process.env.EXPO_PUBLIC_FATSECRET_CLIENT_SECRET ||
+      '';
 
-    if (!clientId || !clientSecret || clientSecret === 'your_fatsecret_client_secret_here') {
+    if (
+      !clientId ||
+      !clientSecret ||
+      clientId === 'your_fatsecret_client_id_here' ||
+      clientSecret === 'your_fatsecret_client_secret_here'
+    ) {
       return Response.json(
         { error: 'FatSecret credentials not configured on server' },
         { status: 500 }

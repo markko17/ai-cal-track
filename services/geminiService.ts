@@ -26,7 +26,10 @@ export interface GeneratedFitnessPlan {
   };
 }
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebaseConfig';
 import Colors from '../constants/colors';
 
 /**
@@ -321,14 +324,57 @@ export function getFallbackFoodAnalysis(imageUri?: string): AIFoodAnalysisResult
     };
   }
 
-  return {
-    foodName: 'Scanned Healthy Meal',
-    calories: 450,
-    protein: 30,
-    carbs: 42,
-    fat: 14,
-    servingSize: '1 serving (350g)',
-  };
+  // Diverse preset meals for offline / unconfigured API keys
+  const presets: AIFoodAnalysisResult[] = [
+    {
+      foodName: 'Grilled Chicken & White Rice',
+      calories: 420,
+      protein: 38,
+      carbs: 48,
+      fat: 7,
+      servingSize: '1 plate (350g)',
+    },
+    {
+      foodName: 'Avocado Toast with Fried Egg',
+      calories: 330,
+      protein: 14,
+      carbs: 28,
+      fat: 19,
+      servingSize: '2 slices (200g)',
+    },
+    {
+      foodName: 'Salmon & Quinoa Power Bowl',
+      calories: 480,
+      protein: 32,
+      carbs: 42,
+      fat: 18,
+      servingSize: '1 bowl (380g)',
+    },
+    {
+      foodName: 'Beef Steak with Roasted Potatoes',
+      calories: 540,
+      protein: 42,
+      carbs: 35,
+      fat: 22,
+      servingSize: '1 plate (400g)',
+    },
+    {
+      foodName: 'Filipino Chicken Adobo with Rice',
+      calories: 490,
+      protein: 36,
+      carbs: 52,
+      fat: 14,
+      servingSize: '1 bowl (350g)',
+    },
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < uriLower.length; i++) {
+    hash = (hash << 5) - hash + uriLower.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % presets.length;
+  return presets[index];
 }
 
 async function convertUriToBase64(uri: string): Promise<string> {
@@ -382,21 +428,23 @@ export async function analyzeFoodImageWithGemini(
     process.env.GEMINI_API_KEY ||
     '';
 
+  const isConfiguredKey = apiKey && apiKey !== 'your_gemini_api_key_here';
+
   let base64Data = providedBase64 || '';
 
   if (!base64Data && imageUri) {
     base64Data = await convertUriToBase64(imageUri);
   }
 
-  if (!apiKey || !base64Data) {
-    console.warn('⚠️ Gemini Food Scan: Base64 image data or API key missing.');
+  if (!isConfiguredKey || !base64Data) {
+    console.warn('⚠️ Gemini Food Scan: Base64 image data or API key missing/unconfigured.');
     return getFallbackFoodAnalysis(imageUri);
   }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.6-flash'];
+  const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-omni-flash-preview'];
 
   const prompt = `You are an expert AI nutritionist and food recognition specialist.
 Look closely at the food in this photo.
@@ -492,5 +540,202 @@ CRITICAL: Return ONLY a valid raw JSON object (no markdown, no extra text) match
   clearTimeout(timeoutId);
   console.warn('⚠️ All Gemini AI model attempts failed. Returning smart fallback estimation.');
   return getFallbackFoodAnalysis(imageUri);
+}
+
+export interface BentoInputData {
+  consumedCalories: number;
+  burnedCalories: number;
+  dailyCalorieGoal: number;
+  consumedWaterLiters: number;
+  waterGoalLiters: number;
+  consumedProtein: number;
+  proteinGoal: number;
+  consumedCarbs: number;
+  carbsGoal: number;
+  consumedFat: number;
+  fatGoal: number;
+  userWeight?: string;
+  userGoal?: string;
+  entriesCount?: number;
+}
+
+export interface AIBentoInsight {
+  aiAssessment: string;
+  recoveryScore: number;
+  actionableTip: string;
+  statusLabel: string;
+}
+
+export function getFallbackBentoInsight(data: BentoInputData): AIBentoInsight {
+  const netCalories = data.consumedCalories - data.burnedCalories;
+  const calRatio = data.dailyCalorieGoal > 0 ? data.consumedCalories / data.dailyCalorieGoal : 0;
+  const waterRatio = data.waterGoalLiters > 0 ? data.consumedWaterLiters / data.waterGoalLiters : 0;
+  const proteinRatio = data.proteinGoal > 0 ? data.consumedProtein / data.proteinGoal : 0;
+
+  let score = 75;
+  if (calRatio >= 0.7 && calRatio <= 1.1) score += 10;
+  if (waterRatio >= 0.7) score += 10;
+  if (proteinRatio >= 0.8) score += 5;
+
+  score = Math.min(99, Math.max(50, score));
+
+  let statusLabel = 'On Track';
+  if (netCalories < 0 && data.consumedCalories > 0) statusLabel = 'Deficit Mode';
+  else if (calRatio > 1.1) statusLabel = 'Calorie Surplus';
+
+  let advice = `Great progress today! You logged ${data.consumedCalories} kcal (${Math.round(calRatio * 100)}% of daily goal) and ${data.consumedProtein}g of protein.`;
+  if (waterRatio < 0.6) {
+    advice += ` Drink a bit more water to reach your ${data.waterGoalLiters}L target.`;
+  }
+
+  return {
+    aiAssessment: advice,
+    recoveryScore: score,
+    actionableTip: `Hit your ${data.proteinGoal}g protein target and stay consistent with hydration!`,
+    statusLabel,
+  };
+}
+
+export async function generateBentoInsightsWithAI(data: BentoInputData): Promise<AIBentoInsight> {
+  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+  const isConfiguredKey = apiKey && apiKey !== 'your_gemini_api_key_here';
+
+  if (!isConfiguredKey) {
+    return getFallbackBentoInsight(data);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  const prompt = `You are a high-performance AI fitness coach analyzing live user health telemetry.
+Analyze the following live database records and return a personalized JSON assessment:
+
+Live Database Data:
+- Consumed Calories: ${data.consumedCalories} kcal (Goal: ${data.dailyCalorieGoal} kcal)
+- Burned Calories: ${data.burnedCalories} kcal
+- Water Consumed: ${data.consumedWaterLiters} Liters (Goal: ${data.waterGoalLiters} L)
+- Protein Consumed: ${data.consumedProtein}g (Goal: ${data.proteinGoal}g)
+- Carbs Consumed: ${data.consumedCarbs}g (Goal: ${data.carbsGoal}g)
+- Fat Consumed: ${data.consumedFat}g (Goal: ${data.fatGoal}g)
+- User Primary Goal: ${data.userGoal || 'Fitness'}
+- Current Weight: ${data.userWeight || '75 kg'}
+- Logged Entries Today: ${data.entriesCount || 0}
+
+CRITICAL: Return ONLY a valid raw JSON object matching this structure:
+{
+  "aiAssessment": "Short 2-sentence encouraging assessment of their daily progress and energy status.",
+  "recoveryScore": number (0-100 score based on calorie, hydration & macro balance),
+  "actionableTip": "One specific, actionable tip for the rest of the day.",
+  "statusLabel": "Status (e.g. Optimal Deficit, Hydration On Track, Surplus, Recovery Mode)"
+}`;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, responseMimeType: 'application/json' },
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.ok) {
+      const resJson = await response.json();
+      const rawText = resJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawText) {
+        clearTimeout(timeoutId);
+        const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanedText);
+
+        return {
+          aiAssessment: parsed.aiAssessment || getFallbackBentoInsight(data).aiAssessment,
+          recoveryScore: typeof parsed.recoveryScore === 'number' ? Math.min(100, Math.max(0, parsed.recoveryScore)) : 85,
+          actionableTip: parsed.actionableTip || getFallbackBentoInsight(data).actionableTip,
+          statusLabel: parsed.statusLabel || 'On Track',
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[Gemini AI Bento Insight] Fetch error or timeout:', err);
+  }
+
+  clearTimeout(timeoutId);
+  return getFallbackBentoInsight(data);
+}
+
+export interface CachedBentoInsight extends AIBentoInsight {
+  generatedAt: string;
+}
+
+const BENTO_CACHE_KEY = (userId: string) => `bento_ai_insight_${userId}`;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+
+export async function getCachedBentoInsight(userId: string): Promise<CachedBentoInsight | null> {
+  if (!userId) return null;
+
+  try {
+    const raw = await AsyncStorage.getItem(BENTO_CACHE_KEY(userId));
+    if (raw) {
+      const parsed: CachedBentoInsight = JSON.parse(raw);
+      if (parsed && parsed.generatedAt) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('Bento cache read error (AsyncStorage):', err);
+  }
+
+  try {
+    const snap = await getDoc(doc(db, 'users', userId, 'bentoInsights', 'latest'));
+    if (snap.exists()) {
+      const data = snap.data() as CachedBentoInsight;
+      if (data && data.generatedAt) {
+        await AsyncStorage.setItem(BENTO_CACHE_KEY(userId), JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Bento cache read error (Firestore):', err);
+  }
+
+  return null;
+}
+
+export async function saveBentoInsightToStorageAndDB(
+  userId: string,
+  insight: AIBentoInsight
+): Promise<CachedBentoInsight> {
+  const cachedObj: CachedBentoInsight = {
+    ...insight,
+    generatedAt: new Date().toISOString(),
+  };
+
+  if (userId) {
+    try {
+      await AsyncStorage.setItem(BENTO_CACHE_KEY(userId), JSON.stringify(cachedObj));
+    } catch (err) {
+      console.warn('Bento cache save error (AsyncStorage):', err);
+    }
+
+    try {
+      const docRef = doc(db, 'users', userId, 'bentoInsights', 'latest');
+      await setDoc(docRef, cachedObj, { merge: true });
+    } catch (err) {
+      console.warn('Bento cache save error (Firestore):', err);
+    }
+  }
+
+  return cachedObj;
+}
+
+export function shouldRegenerateBentoAI(cached: CachedBentoInsight | null): boolean {
+  if (!cached || !cached.generatedAt) return true;
+  const lastTime = new Date(cached.generatedAt).getTime();
+  if (isNaN(lastTime)) return true;
+  const now = Date.now();
+  const diffMs = now - lastTime;
+  return diffMs > SIX_HOURS_MS;
 }
 

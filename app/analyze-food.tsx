@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -206,9 +207,16 @@ export default function AnalyzeFoodScreen() {
                 <Ionicons name="sparkles" size={18} color="#10B981" />
               </View>
               <View style={styles.resultCardTextCol}>
-                <Text style={styles.resultDishName} numberOfLines={1}>
-                  {aiResult.foodName}
-                </Text>
+                <Text style={styles.detectedLabel}>Detected Dish (Tap to edit):</Text>
+                <TextInput
+                  style={styles.resultDishNameInput}
+                  value={aiResult.foodName}
+                  onChangeText={(text) =>
+                    setAiResult((prev) => (prev ? { ...prev, foodName: text } : prev))
+                  }
+                  placeholder="Dish name"
+                  placeholderTextColor="#047857"
+                />
                 <Text style={styles.resultServingText}>{aiResult.servingSize}</Text>
               </View>
               <View style={styles.resultCalBadge}>
@@ -425,6 +433,23 @@ const styles = StyleSheet.create({
   resultCardTextCol: {
     flex: 1,
   },
+  detectedLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#047857',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  resultDishNameInput: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#065F46',
+    padding: 0,
+    margin: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#A7F3D0',
+  },
   resultDishName: {
     fontSize: 15,
     fontWeight: '800',
@@ -434,7 +459,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#047857',
-    marginTop: 1,
+    marginTop: 3,
   },
   resultCalBadge: {
     flexDirection: 'row',

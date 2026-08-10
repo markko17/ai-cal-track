@@ -29,11 +29,27 @@ export default function FoodDatabaseScreen() {
 
   const filters = ['All', 'High Protein', 'Low Carb', 'Breakfast', 'Snacks'];
 
-  // Debounced search logic when searchQuery >= 3 chars
-  const performSearch = useCallback(async (query: string) => {
+  // Debounced search logic when searchQuery >= 3 chars or activeFilter is set
+  const performSearch = useCallback(async (query: string, filter: string) => {
     const trimmed = query.trim();
+
+    // If query is short but a specific filter is active, provide default category results
     if (trimmed.length < 3) {
-      setResults([]);
+      if (filter === 'High Protein') {
+        const data = await searchFatSecretFoods('chicken');
+        setResults(data.filter((item) => item.protein >= 15));
+      } else if (filter === 'Low Carb') {
+        const data = await searchFatSecretFoods('egg');
+        setResults(data.filter((item) => item.carbs <= 10));
+      } else if (filter === 'Breakfast') {
+        const data = await searchFatSecretFoods('egg');
+        setResults(data);
+      } else if (filter === 'Snacks') {
+        const data = await searchFatSecretFoods('yogurt');
+        setResults(data);
+      } else {
+        setResults([]);
+      }
       setIsLoading(false);
       return;
     }
@@ -41,7 +57,27 @@ export default function FoodDatabaseScreen() {
     setIsLoading(true);
     try {
       const data = await searchFatSecretFoods(trimmed);
-      setResults(data);
+      let filteredData = data;
+
+      if (filter === 'High Protein') {
+        const hp = data.filter((item) => item.protein >= 12);
+        filteredData = hp.length > 0 ? hp : data;
+      } else if (filter === 'Low Carb') {
+        const lc = data.filter((item) => item.carbs <= 12);
+        filteredData = lc.length > 0 ? lc : data;
+      } else if (filter === 'Breakfast') {
+        const b = data.filter((item) =>
+          /egg|oat|yogurt|bread|pancake|toast|coffee|bacon|waffle|bagel/i.test(item.food_name)
+        );
+        filteredData = b.length > 0 ? b : data;
+      } else if (filter === 'Snacks') {
+        const s = data.filter((item) =>
+          /yogurt|apple|banana|nut|almond|shake|bar|fruit|snack|cookie/i.test(item.food_name)
+        );
+        filteredData = s.length > 0 ? s : data;
+      }
+
+      setResults(filteredData);
     } catch (err) {
       console.error('Error during food search:', err);
       setResults([]);
@@ -52,11 +88,11 @@ export default function FoodDatabaseScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      performSearch(searchQuery);
+      performSearch(searchQuery, activeFilter);
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, performSearch]);
+  }, [searchQuery, activeFilter, performSearch]);
 
   const handleSelectFood = (item: FatSecretFoodItem) => {
     router.push({
@@ -74,9 +110,6 @@ export default function FoodDatabaseScreen() {
 
   const handleFilterPress = (filterName: string) => {
     setActiveFilter(filterName);
-    if (filterName !== 'All') {
-      setSearchQuery(filterName);
-    }
   };
 
   const renderFoodCard = ({ item }: { item: FatSecretFoodItem }) => {
@@ -245,7 +278,7 @@ export default function FoodDatabaseScreen() {
               </View>
               <Text style={styles.placeholderTitle}>No Foods Found</Text>
               <Text style={styles.placeholderSub}>
-                No results found for "{searchQuery}". Try searching another item.
+                {`No results found for "${searchQuery}". Try searching another item.`}
               </Text>
             </View>
           ) : (

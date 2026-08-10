@@ -241,6 +241,53 @@ export const updateUserMacroTargets = async (
   }
 };
 
+const localDateKey = (date: Date): string => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+/**
+ * Update user weight in Firestore along with the update date.
+ * Appends to weightHistory so weight changes over time can be charted.
+ */
+export const updateUserWeight = async (uid: string, weightKg: number): Promise<void> => {
+  if (!uid) return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+    const existingData = userSnap.exists() ? userSnap.data() : {};
+
+    const todayKey = localDateKey(new Date());
+    const historyEntry = { weight: weightKg, date: todayKey };
+    const existingHistory = Array.isArray(existingData.weightHistory)
+      ? existingData.weightHistory
+      : [];
+
+    const updatePayload: Record<string, any> = {
+      weight: String(weightKg),
+      weightUpdatedAt: todayKey,
+      weightHistory: [...existingHistory, historyEntry],
+      updatedAt: serverTimestamp(),
+    };
+
+    await setDoc(userRef, updatePayload, { merge: true });
+    console.log('✅ [Firebase] User weight updated in Firestore:', uid);
+
+    // Sync local SecureStore / localStorage so cached profile stays up to date
+    const existingLocal = await getUserOnboardingFromStorage(uid);
+    const updatedLocal = {
+      ...(existingLocal || {}),
+      weight: String(weightKg),
+    };
+    await saveUserOnboardingToStorage(uid, updatedLocal);
+  } catch (error) {
+    console.error('❌ [Firebase] Error updating user weight:', error);
+    throw error;
+  }
+};
+
 
 
 
