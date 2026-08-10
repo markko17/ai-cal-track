@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="manual-calories" options={{ headerShown: false }} />
         <Stack.Screen name="food-database" options={{ headerShown: false }} />
         <Stack.Screen name="log-food-detail" options={{ headerShown: false }} />
+        <Stack.Screen name="update-weight" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack>
       <ClerkLoaded>

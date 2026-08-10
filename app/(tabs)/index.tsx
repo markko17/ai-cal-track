@@ -220,9 +220,9 @@ export default function HomeTabScreen() {
               onPress={() => setIsAddModalVisible(true)}
               activeOpacity={0.9}
             >
-              <Text style={styles.emptyLogCardTitle}>You haven't uploaded any food</Text>
+              <Text style={styles.emptyLogCardTitle}>You haven&apos;t uploaded any food</Text>
               <Text style={styles.emptyLogCardSubtitle}>
-                Start tracking today's meals by taking a quick picture.
+                Start tracking today&apos;s meals by taking a quick picture.
               </Text>
             </TouchableOpacity>
 

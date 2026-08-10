@@ -1,10 +1,23 @@
+import BentoGridCard from '@/components/BentoGridCard';
+import { WeekMacroData } from '@/components/WeeklyMacroBalanceCard';
+import WeeklyEnergyCard from '@/components/WeeklyEnergyCard';
+import WeeklyWaterCard, { WeekWaterData } from '@/components/WeeklyWaterCard';
 import Colors from '@/constants/colors';
+import { getDailyLogByDate } from '@/services/dailyLogService';
+import {
+  AIBentoInsight,
+  BentoInputData,
+  generateBentoInsightsWithAI,
+  getCachedBentoInsight,
+  saveBentoInsightToStorageAndDB,
+  shouldRegenerateBentoAI,
+} from '@/services/geminiService';
 import { getUserFromFirestore } from '@/services/userService';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -13,10 +26,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
+  View
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { db } from '../../config/firebaseConfig';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const WEEK_DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const WEEK_DAY_DDD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_ICONS = ['flame', 'restaurant', 'barbell', 'water', 'walk', 'heart', 'trophy'] as const;
@@ -26,46 +38,185 @@ interface WeekStreakData {
   hasActivity: boolean;
 }
 
+type WeekCaloriesData = {
+  day: string;
+  consumed: number;
+  burned: number;
+};
+
 export default function AnalyticsTabScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useUser();
+  const router = useRouter();
   const [userWeight, setUserWeight] = useState<string>('--');
   const [weekStreak, setWeekStreak] = useState<WeekStreakData[]>([]);
+  const [weekCalories, setWeekCalories] = useState<WeekCaloriesData[]>([]);
+  const [weekMacros, setWeekMacros] = useState<WeekMacroData[]>([]);
+  const [weekWater, setWeekWater] = useState<WeekWaterData[]>([]);
+  const [bentoInsight, setBentoInsight] = useState<AIBentoInsight | null>(null);
+  const [isBentoAILoading, setIsBentoAILoading] = useState<boolean>(false);
+  const [todayTelemetry, setTodayTelemetry] = useState<BentoInputData>({
+    consumedCalories: 0,
+    burnedCalories: 0,
+    dailyCalorieGoal: 2000,
+    consumedWaterLiters: 0,
+    waterGoalLiters: 2.5,
+    consumedProtein: 0,
+    proteinGoal: 150,
+    consumedCarbs: 0,
+    carbsGoal: 200,
+    consumedFat: 0,
+    fatGoal: 65,
+  });
+  const [waterGoal, setWaterGoal] = useState<number>(2.5);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
   const requestIdRef = useRef(0);
 
-  useEffect(() => {
-    const userId = user?.id;
-    const requestId = ++requestIdRef.current;
+  const resetUserState = () => {
+    setUserWeight('--');
+    setWeekStreak([]);
+    setWeekCalories([]);
+    setWeekMacros([]);
+    setWeekWater([]);
+    setBentoInsight(null);
+    setWaterGoal(2.5);
+    setCurrentStreak(0);
+    setIsBentoAILoading(false);
+    setIsLoading(false);
+    setTodayTelemetry({
+      consumedCalories: 0,
+      burnedCalories: 0,
+      dailyCalorieGoal: 2000,
+      consumedWaterLiters: 0,
+      waterGoalLiters: 2.5,
+      consumedProtein: 0,
+      proteinGoal: 150,
+      consumedCarbs: 0,
+      carbsGoal: 200,
+      consumedFat: 0,
+      fatGoal: 65,
+    });
+  };
 
-    if (!userId) {
-      setUserWeight('--');
-      setWeekStreak([]);
-      setCurrentStreak(0);
-      setIsLoading(false);
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      const userId = user?.id;
+      const requestId = ++requestIdRef.current;
 
-    setIsLoading(true);
-    fetchAnalyticsData(userId, requestId);
+      resetUserState();
 
-    return () => {
-      if (requestIdRef.current === requestId) {
-        requestIdRef.current += 1;
+      if (!userId) {
+        return;
       }
-    };
-  }, [user?.id]);
+
+      setIsLoading(true);
+      fetchAnalyticsData(userId, requestId);
+
+      return () => {
+        if (requestIdRef.current === requestId) {
+          requestIdRef.current += 1;
+        }
+      };
+    }, [user?.id])
+  );
+
+  const fetchBentoAI = useCallback(
+    async (userId: string, telemetryData: BentoInputData, forceRefresh = false, requestId?: number) => {
+      // 1. Check cached insight from database / storage first
+      const cached = await getCachedBentoInsight(userId);
+      if (requestId !== undefined && requestId !== requestIdRef.current) return;
+      if (cached) {
+        setBentoInsight(cached);
+      }
+
+      // 2. Check 6-hour rule
+      const needsRegeneration = forceRefresh || shouldRegenerateBentoAI(cached);
+
+      if (needsRegeneration) {
+        setIsBentoAILoading(true);
+        try {
+          const freshInsight = await generateBentoInsightsWithAI(telemetryData);
+          if (requestId !== undefined && requestId !== requestIdRef.current) return;
+          setBentoInsight(freshInsight);
+          await saveBentoInsightToStorageAndDB(userId, freshInsight);
+        } catch (err) {
+          console.error('Error generating Bento AI insight:', err);
+        } finally {
+          if (requestId === undefined || requestId === requestIdRef.current) {
+            setIsBentoAILoading(false);
+          }
+        }
+      }
+    },
+    []
+  );
+
+  const handleRefreshBentoAI = () => {
+    if (user?.id) {
+      fetchBentoAI(user.id, todayTelemetry, true, requestIdRef.current);
+    }
+  };
 
   const fetchAnalyticsData = async (userId: string, requestId: number) => {
     try {
       const userResult = await getUserFromFirestore(userId);
       if (requestId !== requestIdRef.current) return;
-      if (userResult.exists && userResult.data?.weight) {
-        setUserWeight(userResult.data.weight);
+
+      let goal = 'Maintain weight';
+      let calorieGoal = 2000;
+      let wGoal = 2.5;
+      let pGoal = 150;
+      let cGoal = 200;
+      let fGoal = 65;
+      let weight = '--';
+
+      if (userResult.exists && userResult.data) {
+        const uData = userResult.data;
+        if (uData.weight) {
+          weight = uData.weight;
+          setUserWeight(uData.weight);
+        }
+        if (uData.goal) goal = uData.goal;
+        if (uData.dailyCalorieGoal) calorieGoal = uData.dailyCalorieGoal;
+        if (uData.waterGoal?.liters) {
+          wGoal = uData.waterGoal.liters;
+          setWaterGoal(uData.waterGoal.liters);
+        }
+        if (uData.macroGoals) {
+          if (uData.macroGoals.protein) pGoal = uData.macroGoals.protein;
+          if (uData.macroGoals.carbs) cGoal = uData.macroGoals.carbs;
+          if (uData.macroGoals.fat) fGoal = uData.macroGoals.fat;
+        }
       }
-      await fetchWeekStreak(userId, requestId);
+
+      // Fetch Today's Daily Log from Database
+      const todayStr = dateKey(new Date());
+      const todayLog = await getDailyLogByDate(userId, todayStr);
+      if (requestId !== requestIdRef.current) return;
+
+      const liveTelemetry: BentoInputData = {
+        consumedCalories: todayLog.consumedCalories || 0,
+        burnedCalories: todayLog.burnedCalories || 0,
+        dailyCalorieGoal: calorieGoal,
+        consumedWaterLiters: todayLog.consumedWaterLiters || 0,
+        waterGoalLiters: wGoal,
+        consumedProtein: todayLog.consumedProtein || 0,
+        proteinGoal: pGoal,
+        consumedCarbs: todayLog.consumedCarbs || 0,
+        carbsGoal: cGoal,
+        consumedFat: todayLog.consumedFat || 0,
+        fatGoal: fGoal,
+        userWeight: weight,
+        userGoal: goal,
+        entriesCount: todayLog.entries ? todayLog.entries.length : 0,
+      };
+
+      setTodayTelemetry(liveTelemetry);
+      fetchBentoAI(userId, liveTelemetry, false, requestId);
+
+      await fetchWeekData(userId, requestId);
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
       console.error('Error fetching analytics data:', error);
@@ -76,7 +227,7 @@ export default function AnalyticsTabScreen() {
     }
   };
 
-  const fetchWeekStreak = async (userId: string, requestId: number) => {
+  const fetchWeekData = async (userId: string, requestId: number) => {
     const today = new Date();
     const startOfWeek = new Date(today);
     const dayOfWeek = today.getDay();
@@ -85,14 +236,48 @@ export default function AnalyticsTabScreen() {
 
     const currentDayIndex = (today.getDay() + 6) % 7;
     const streakData: WeekStreakData[] = [];
+    const calorieRows: WeekCaloriesData[] = [];
+    const macroRows: WeekMacroData[] = [];
+    const waterRows: WeekWaterData[] = [];
 
     for (let i = 0; i < 7; i++) {
       const dayDate = new Date(startOfWeek);
       dayDate.setDate(startOfWeek.getDate() + i);
       const dateStr = dateKey(dayDate);
-      const hasActivity = await checkDayActivity(userId, dateStr);
+      const log = await getDailyLogByDate(userId, dateStr);
       if (requestId !== requestIdRef.current) return;
+
+      const hasActivity = log.entries.length > 0 || (log.consumedWaterLiters || 0) > 0;
       streakData.push({ dayIndex: i, hasActivity });
+      calorieRows.push({
+        day: WEEK_DAY_DDD[i],
+        consumed: log.consumedCalories || 0,
+        burned: log.burnedCalories || 0,
+      });
+
+      // Calculate macro calories (Protein: 4 cal/g, Carbs: 4 cal/g, Fat: 9 cal/g)
+      let pCal = Math.round((log.consumedProtein || 0) * 4);
+      let cCal = Math.round((log.consumedCarbs || 0) * 4);
+      let fCal = Math.round((log.consumedFat || 0) * 9);
+
+      // Fallback distribution if consumedCalories > 0 but individual macros weren't explicitly entered
+      if (pCal === 0 && cCal === 0 && fCal === 0 && (log.consumedCalories || 0) > 0) {
+        pCal = Math.round((log.consumedCalories || 0) * 0.3);
+        cCal = Math.round((log.consumedCalories || 0) * 0.45);
+        fCal = Math.round((log.consumedCalories || 0) * 0.25);
+      }
+
+      macroRows.push({
+        day: WEEK_DAY_DDD[i],
+        proteinCal: pCal,
+        carbsCal: cCal,
+        fatCal: fCal,
+      });
+
+      waterRows.push({
+        day: WEEK_DAY_DDD[i],
+        liters: log.consumedWaterLiters || 0,
+      });
     }
 
     let streakCount = 0;
@@ -110,16 +295,9 @@ export default function AnalyticsTabScreen() {
     if (requestId !== requestIdRef.current) return;
     setWeekStreak(streakData);
     setCurrentStreak(streakCount);
-  };
-
-  const checkDayActivity = async (userId: string, dateStr: string): Promise<boolean> => {
-    const logRef = doc(db, 'users', userId, 'dailyLogs', dateStr);
-    const snapshot = await getDoc(logRef);
-    if (!snapshot.exists()) return false;
-    const data = snapshot.data();
-    const entries = data?.entries || [];
-    const hasWaterLog = (data?.consumedWaterLiters || 0) > 0;
-    return entries.length > 0 || hasWaterLog;
+    setWeekCalories(calorieRows);
+    setWeekMacros(macroRows);
+    setWeekWater(waterRows);
   };
 
   const dateKey = (date: Date): string => {
@@ -188,7 +366,7 @@ export default function AnalyticsTabScreen() {
                         >
                           <Ionicons
                             name={DAY_ICONS[i]}
-                            size={12}
+                            size={11}
                             color={checked ? '#FFFFFF' : '#F97316'}
                           />
                         </View>
@@ -202,25 +380,56 @@ export default function AnalyticsTabScreen() {
               </Pressable>
 
               {/* Weight Card */}
-              <View style={[styles.card, styles.weightCard]}>
-                <View style={styles.weightHeaderRow}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.card,
+                  styles.weightCard,
+                  pressed && styles.cardPressed,
+                ]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/update-weight',
+                    params: { weight: userWeight },
+                  })
+                }
+              >
+                <View style={styles.weightTopRow}>
                   <View style={styles.weightIconWrap}>
-                    <Ionicons name="scale-outline" size={26} color="#8B5CF6" />
+                    <Ionicons name="scale-outline" size={22} color="#8B5CF6" />
                   </View>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={Colors.textMuted}
+                  />
+                </View>
+
+                <View style={styles.weightContent}>
                   <Text style={styles.weightLabel}>My Weight</Text>
+                  <View style={styles.weightValueRow}>
+                    <Text style={styles.weightNum}>{userWeight}</Text>
+                    <Text style={styles.weightUnit}>kg</Text>
+                  </View>
                 </View>
-                <View style={styles.weightValueRow}>
-                  <Text style={styles.weightNum}>{userWeight}</Text>
-                  <Text style={styles.weightUnit}>kg</Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={Colors.textMuted}
-                  style={styles.weightNext}
-                />
-              </View>
+              </Pressable>
             </View>
+
+            {/* Weekly Energy Card */}
+            <WeeklyEnergyCard data={weekCalories} isLoading={isLoading} />
+
+            {/* Bento Grid AI Progress Insights Section (Live Database Data + Gemini AI Engine) */}
+            <BentoGridCard
+              telemetry={todayTelemetry}
+              aiInsight={bentoInsight}
+              currentStreak={currentStreak}
+              isAILoading={isBentoAILoading}
+              onRefreshAI={handleRefreshBentoAI}
+              weekMacros={weekMacros}
+              isLoadingMacros={isLoading}
+            />
+
+            {/* Weekly Water Consumption Card */}
+            <WeeklyWaterCard data={weekWater} waterGoalLiters={waterGoal} isLoading={isLoading} />
 
             {/* Motivational Card */}
             <View style={styles.motiveCard}>
@@ -243,7 +452,7 @@ export default function AnalyticsTabScreen() {
         onRequestClose={() => setIsStreakModalOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setIsStreakModalOpen(false)}>
-          <Pressable style={styles.modalDialog} onPress={() => {}}>
+          <Pressable style={styles.modalDialog} onPress={() => { }}>
             <View style={styles.modalStreakHeader}>
               <Image source={require('../../assets/images/fire.png')} style={styles.modalFireImg} />
               <View style={styles.modalStreakTextCol}>
@@ -334,14 +543,20 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 14,
+    borderRadius: 24,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
 
   streakCard: {
     marginRight: CARD_GAP / 2,
+    justifyContent: 'space-between',
   },
 
   cardPressed: {
@@ -352,11 +567,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 14,
   },
   fireImg: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
   },
   streakTextCol: {
     flex: 1,
@@ -372,6 +587,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 1,
+    marginBottom: 8,
   },
 
   weekRow: {
@@ -503,48 +719,46 @@ const styles = StyleSheet.create({
 
   weightCard: {
     marginLeft: CARD_GAP / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  weightNext: {
-    position: 'absolute',
-    right: 10,
-    bottom: 10,
-  },
-  weightHeaderRow: {
+  weightTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-    marginRight: 14,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   weightIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  weightContent: {
+    justifyContent: 'flex-end',
+  },
   weightValueRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 3,
+    gap: 4,
   },
   weightNum: {
     color: Colors.text,
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
+    letterSpacing: -0.5,
   },
   weightUnit: {
     color: Colors.textMuted,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
   },
   weightLabel: {
     color: Colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
+    marginBottom: 2,
   },
 
   motiveCard: {
@@ -557,6 +771,43 @@ const styles = StyleSheet.create({
     gap: 14,
     alignItems: 'flex-start',
     marginBottom: 20,
+  },
+  chartCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  chartTitleCol: {
+    flex: 1,
+  },
+  chartTitle: {
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  chartSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  chartIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(249, 115, 22, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   motiveTextCol: {
     flex: 1,

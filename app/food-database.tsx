@@ -27,36 +27,81 @@ export default function FoodDatabaseScreen() {
   const [results, setResults] = useState<FatSecretFoodItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const filters = ['All', 'High Protein', 'Low Carb', 'Breakfast', 'Snacks'];
+  const searchSeqRef = useRef(0);
 
-  // Debounced search logic when searchQuery >= 3 chars
-  const performSearch = useCallback(async (query: string) => {
+  // Debounced search logic when searchQuery >= 3 chars or activeFilter is set
+  const performSearch = useCallback(async (query: string, filter: string, seqId: number) => {
     const trimmed = query.trim();
+
+    setIsLoading(true);
+
+    // If query is short but a specific filter is active, provide default category results
     if (trimmed.length < 3) {
-      setResults([]);
+      let filteredData: FatSecretFoodItem[] = [];
+      if (filter === 'High Protein') {
+        const data = await searchFatSecretFoods('chicken');
+        filteredData = data.filter((item) => item.protein >= 15);
+      } else if (filter === 'Low Carb') {
+        const data = await searchFatSecretFoods('egg');
+        filteredData = data.filter((item) => item.carbs <= 10);
+      } else if (filter === 'Breakfast') {
+        const data = await searchFatSecretFoods('egg');
+        filteredData = data;
+      } else if (filter === 'Snacks') {
+        const data = await searchFatSecretFoods('yogurt');
+        filteredData = data;
+      }
+
+      if (seqId !== searchSeqRef.current) return;
+      setResults(filteredData);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
     try {
       const data = await searchFatSecretFoods(trimmed);
-      setResults(data);
+      if (seqId !== searchSeqRef.current) return;
+
+      let filteredData = data;
+
+      if (filter === 'High Protein') {
+        const hp = data.filter((item) => item.protein >= 12);
+        filteredData = hp.length > 0 ? hp : data;
+      } else if (filter === 'Low Carb') {
+        const lc = data.filter((item) => item.carbs <= 12);
+        filteredData = lc.length > 0 ? lc : data;
+      } else if (filter === 'Breakfast') {
+        const b = data.filter((item) =>
+          /egg|oat|yogurt|bread|pancake|toast|coffee|bacon|waffle|bagel/i.test(item.food_name)
+        );
+        filteredData = b.length > 0 ? b : data;
+      } else if (filter === 'Snacks') {
+        const s = data.filter((item) =>
+          /yogurt|apple|banana|nut|almond|shake|bar|fruit|snack|cookie/i.test(item.food_name)
+        );
+        filteredData = s.length > 0 ? s : data;
+      }
+
+      setResults(filteredData);
     } catch (err) {
+      if (seqId !== searchSeqRef.current) return;
       console.error('Error during food search:', err);
       setResults([]);
     } finally {
-      setIsLoading(false);
+      if (seqId === searchSeqRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    const seqId = ++searchSeqRef.current;
     const timer = setTimeout(() => {
-      performSearch(searchQuery);
+      performSearch(searchQuery, activeFilter, seqId);
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, performSearch]);
+  }, [searchQuery, activeFilter, performSearch]);
 
   const handleSelectFood = (item: FatSecretFoodItem) => {
     router.push({
@@ -74,9 +119,6 @@ export default function FoodDatabaseScreen() {
 
   const handleFilterPress = (filterName: string) => {
     setActiveFilter(filterName);
-    if (filterName !== 'All') {
-      setSearchQuery(filterName);
-    }
   };
 
   const renderFoodCard = ({ item }: { item: FatSecretFoodItem }) => {
@@ -228,7 +270,7 @@ export default function FoodDatabaseScreen() {
               <ActivityIndicator size="large" color="#0F172A" />
               <Text style={styles.statusText}>Searching database...</Text>
             </View>
-          ) : searchQuery.trim().length < 3 ? (
+          ) : searchQuery.trim().length < 3 && activeFilter === 'All' ? (
             <View style={styles.centerContainer}>
               <View style={styles.emptyIconBg}>
                 <Ionicons name="search" size={32} color="#64748B" />
@@ -245,7 +287,7 @@ export default function FoodDatabaseScreen() {
               </View>
               <Text style={styles.placeholderTitle}>No Foods Found</Text>
               <Text style={styles.placeholderSub}>
-                No results found for "{searchQuery}". Try searching another item.
+                {`No results found for "${searchQuery}". Try searching another item.`}
               </Text>
             </View>
           ) : (
