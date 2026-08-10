@@ -33,7 +33,10 @@ export default function UpdateWeightScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setIsLoadingProfile(false);
+      return;
+    }
     let cancelled = false;
 
     const paramsWeight = parseFloat(params.weight || '');

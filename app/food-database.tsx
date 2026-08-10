@@ -27,36 +27,41 @@ export default function FoodDatabaseScreen() {
   const [results, setResults] = useState<FatSecretFoodItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const filters = ['All', 'High Protein', 'Low Carb', 'Breakfast', 'Snacks'];
+  const searchSeqRef = useRef(0);
 
   // Debounced search logic when searchQuery >= 3 chars or activeFilter is set
-  const performSearch = useCallback(async (query: string, filter: string) => {
+  const performSearch = useCallback(async (query: string, filter: string, seqId: number) => {
     const trimmed = query.trim();
+
+    setIsLoading(true);
 
     // If query is short but a specific filter is active, provide default category results
     if (trimmed.length < 3) {
+      let filteredData: FatSecretFoodItem[] = [];
       if (filter === 'High Protein') {
         const data = await searchFatSecretFoods('chicken');
-        setResults(data.filter((item) => item.protein >= 15));
+        filteredData = data.filter((item) => item.protein >= 15);
       } else if (filter === 'Low Carb') {
         const data = await searchFatSecretFoods('egg');
-        setResults(data.filter((item) => item.carbs <= 10));
+        filteredData = data.filter((item) => item.carbs <= 10);
       } else if (filter === 'Breakfast') {
         const data = await searchFatSecretFoods('egg');
-        setResults(data);
+        filteredData = data;
       } else if (filter === 'Snacks') {
         const data = await searchFatSecretFoods('yogurt');
-        setResults(data);
-      } else {
-        setResults([]);
+        filteredData = data;
       }
+
+      if (seqId !== searchSeqRef.current) return;
+      setResults(filteredData);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
     try {
       const data = await searchFatSecretFoods(trimmed);
+      if (seqId !== searchSeqRef.current) return;
+
       let filteredData = data;
 
       if (filter === 'High Protein') {
@@ -79,16 +84,20 @@ export default function FoodDatabaseScreen() {
 
       setResults(filteredData);
     } catch (err) {
+      if (seqId !== searchSeqRef.current) return;
       console.error('Error during food search:', err);
       setResults([]);
     } finally {
-      setIsLoading(false);
+      if (seqId === searchSeqRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    const seqId = ++searchSeqRef.current;
     const timer = setTimeout(() => {
-      performSearch(searchQuery, activeFilter);
+      performSearch(searchQuery, activeFilter, seqId);
     }, 350);
 
     return () => clearTimeout(timer);
@@ -261,7 +270,7 @@ export default function FoodDatabaseScreen() {
               <ActivityIndicator size="large" color="#0F172A" />
               <Text style={styles.statusText}>Searching database...</Text>
             </View>
-          ) : searchQuery.trim().length < 3 ? (
+          ) : searchQuery.trim().length < 3 && activeFilter === 'All' ? (
             <View style={styles.centerContainer}>
               <View style={styles.emptyIconBg}>
                 <Ionicons name="search" size={32} color="#64748B" />

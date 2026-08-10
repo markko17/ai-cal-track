@@ -216,6 +216,8 @@ export default function AnalyzeFoodScreen() {
                   }
                   placeholder="Dish name"
                   placeholderTextColor="#047857"
+                  accessibilityLabel="Detected dish name"
+                  accessibilityHint="Edit the detected dish name"
                 />
                 <Text style={styles.resultServingText}>{aiResult.servingSize}</Text>
               </View>

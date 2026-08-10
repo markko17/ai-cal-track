@@ -1,10 +1,7 @@
 export async function GET() {
   try {
     const clientId = process.env.EXPO_PUBLIC_FATSECRET_CLIENT_ID || '';
-    const clientSecret =
-      process.env.FATSECRET_CLIENT_SECRET ||
-      process.env.EXPO_PUBLIC_FATSECRET_CLIENT_SECRET ||
-      '';
+    const clientSecret = process.env.FATSECRET_CLIENT_SECRET || '';
 
     if (
       !clientId ||

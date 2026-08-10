@@ -13,12 +13,36 @@ import { Platform } from 'react-native';
  * - On native (Expo Go / dev builds), the app must call the dev server's
  *   LAN address explicitly (same host it's already connected to via Metro).
  */
-function getApiBase(): string {
+/**
+ * Returns the base URL for the local API proxy routes.
+ * - On web, relative URLs resolve against the dev server origin.
+ * - On native (Expo Go / dev builds), resolves against the configured origin or host Uri.
+ */
+export function getApiBase(): string {
   if (Platform.OS === 'web') {
     return '';
   }
+  const origin =
+    process.env.EXPO_PUBLIC_ROUTER_ORIGIN ||
+    process.env.EXPO_ROUTER_ORIGIN ||
+    (Constants.expoConfig?.extra as any)?.router?.origin;
+
+  if (origin) {
+    return origin.replace(/\/$/, '');
+  }
+
   const hostUri = Constants.expoConfig?.hostUri;
-  return hostUri ? `http://${hostUri}` : '';
+  if (hostUri) {
+    const scheme =
+      hostUri.includes('localhost') ||
+      hostUri.startsWith('127.') ||
+      hostUri.startsWith('192.') ||
+      hostUri.startsWith('10.')
+        ? 'http'
+        : 'https';
+    return `${scheme}://${hostUri}`;
+  }
+  return '';
 }
 
 export interface FatSecretFoodItem {
@@ -33,6 +57,8 @@ export interface FatSecretFoodItem {
   protein: number;
   carbs: number;
   fat: number;
+  isEstimated?: boolean;
+  requiresConfirmation?: boolean;
 }
 
 interface CachedToken {
@@ -43,13 +69,10 @@ interface CachedToken {
 let tokenCache: CachedToken | null = null;
 
 const FATSECRET_CLIENT_ID = process.env.EXPO_PUBLIC_FATSECRET_CLIENT_ID || '';
-const FATSECRET_CLIENT_SECRET = process.env.EXPO_PUBLIC_FATSECRET_CLIENT_SECRET || '';
 
 const isFatSecretConfigured =
   !!FATSECRET_CLIENT_ID &&
-  !!FATSECRET_CLIENT_SECRET &&
-  FATSECRET_CLIENT_ID !== 'your_fatsecret_client_id_here' &&
-  FATSECRET_CLIENT_SECRET !== 'your_fatsecret_client_secret_here';
+  FATSECRET_CLIENT_ID !== 'your_fatsecret_client_id_here';
 
 /**
  * Retrieves OAuth 2.0 access token from FatSecret via the server proxy route.
@@ -325,11 +348,13 @@ function generateDynamicFoodResults(query: string): FatSecretFoodItem[] {
     protein: baseProtein,
     carbs: baseCarbs,
     fat: baseFat,
+    isEstimated: true,
+    requiresConfirmation: true,
   };
 
   const secondaryItem: FatSecretFoodItem = {
     food_id: `dynamic_${query.replace(/\s+/g, '_')}_2`,
-    food_name: `Homemade ${capitalized}`,
+    food_name: `Homemade ${capitalized} (Estimated)`,
     food_description: `Per 1 plate (200g) - Calories: ${Math.round(baseCal * 1.2)}kcal | Fat: ${Math.round(baseFat * 1.1)}g | Carbs: ${Math.round(baseCarbs * 1.1)}g | Protein: ${Math.round(baseProtein * 1.1)}g`,
     serving_size: 'Per 1 plate (200g)',
     calories: `${Math.round(baseCal * 1.2)} kcal`,
@@ -337,6 +362,8 @@ function generateDynamicFoodResults(query: string): FatSecretFoodItem[] {
     protein: Math.round(baseProtein * 1.1),
     carbs: Math.round(baseCarbs * 1.1),
     fat: Math.round(baseFat * 1.1),
+    isEstimated: true,
+    requiresConfirmation: true,
   };
 
   return [primaryItem, secondaryItem];

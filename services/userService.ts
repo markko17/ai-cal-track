@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { db } from '../config/firebaseConfig';
 
@@ -256,23 +256,27 @@ export const updateUserWeight = async (uid: string, weightKg: number): Promise<v
   if (!uid) return;
   try {
     const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    const existingData = userSnap.exists() ? userSnap.data() : {};
-
     const todayKey = localDateKey(new Date());
-    const historyEntry = { weight: weightKg, date: todayKey };
-    const existingHistory = Array.isArray(existingData.weightHistory)
-      ? existingData.weightHistory
-      : [];
 
-    const updatePayload: Record<string, any> = {
-      weight: String(weightKg),
-      weightUpdatedAt: todayKey,
-      weightHistory: [...existingHistory, historyEntry],
-      updatedAt: serverTimestamp(),
-    };
+    await runTransaction(db, async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      const existingData = userSnap.exists() ? userSnap.data() : {};
 
-    await setDoc(userRef, updatePayload, { merge: true });
+      const historyEntry = { weight: weightKg, date: todayKey };
+      const existingHistory = Array.isArray(existingData.weightHistory)
+        ? existingData.weightHistory
+        : [];
+
+      const updatePayload: Record<string, any> = {
+        weight: String(weightKg),
+        weightUpdatedAt: todayKey,
+        weightHistory: [...existingHistory, historyEntry],
+        updatedAt: serverTimestamp(),
+      };
+
+      transaction.set(userRef, updatePayload, { merge: true });
+    });
+
     console.log('✅ [Firebase] User weight updated in Firestore:', uid);
 
     // Sync local SecureStore / localStorage so cached profile stays up to date

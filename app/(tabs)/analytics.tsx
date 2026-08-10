@@ -1,4 +1,5 @@
 import BentoGridCard from '@/components/BentoGridCard';
+import { WeekMacroData } from '@/components/WeeklyMacroBalanceCard';
 import WeeklyEnergyCard from '@/components/WeeklyEnergyCard';
 import WeeklyWaterCard, { WeekWaterData } from '@/components/WeeklyWaterCard';
 import Colors from '@/constants/colors';
@@ -50,24 +51,63 @@ export default function AnalyticsTabScreen() {
   const [userWeight, setUserWeight] = useState<string>('--');
   const [weekStreak, setWeekStreak] = useState<WeekStreakData[]>([]);
   const [weekCalories, setWeekCalories] = useState<WeekCaloriesData[]>([]);
+  const [weekMacros, setWeekMacros] = useState<WeekMacroData[]>([]);
   const [weekWater, setWeekWater] = useState<WeekWaterData[]>([]);
+  const [bentoInsight, setBentoInsight] = useState<AIBentoInsight | null>(null);
+  const [isBentoAILoading, setIsBentoAILoading] = useState<boolean>(false);
+  const [todayTelemetry, setTodayTelemetry] = useState<BentoInputData>({
+    consumedCalories: 0,
+    burnedCalories: 0,
+    dailyCalorieGoal: 2000,
+    consumedWaterLiters: 0,
+    waterGoalLiters: 2.5,
+    consumedProtein: 0,
+    proteinGoal: 150,
+    consumedCarbs: 0,
+    carbsGoal: 200,
+    consumedFat: 0,
+    fatGoal: 65,
+  });
   const [waterGoal, setWaterGoal] = useState<number>(2.5);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
   const requestIdRef = useRef(0);
 
+  const resetUserState = () => {
+    setUserWeight('--');
+    setWeekStreak([]);
+    setWeekCalories([]);
+    setWeekMacros([]);
+    setWeekWater([]);
+    setBentoInsight(null);
+    setWaterGoal(2.5);
+    setCurrentStreak(0);
+    setIsBentoAILoading(false);
+    setIsLoading(false);
+    setTodayTelemetry({
+      consumedCalories: 0,
+      burnedCalories: 0,
+      dailyCalorieGoal: 2000,
+      consumedWaterLiters: 0,
+      waterGoalLiters: 2.5,
+      consumedProtein: 0,
+      proteinGoal: 150,
+      consumedCarbs: 0,
+      carbsGoal: 200,
+      consumedFat: 0,
+      fatGoal: 65,
+    });
+  };
+
   useFocusEffect(
     useCallback(() => {
       const userId = user?.id;
       const requestId = ++requestIdRef.current;
 
+      resetUserState();
+
       if (!userId) {
-        setUserWeight('--');
-        setWeekStreak([]);
-        setWeekCalories([]);
-        setCurrentStreak(0);
-        setIsLoading(false);
         return;
       }
 
@@ -82,26 +122,11 @@ export default function AnalyticsTabScreen() {
     }, [user?.id])
   );
 
-  const [bentoInsight, setBentoInsight] = useState<AIBentoInsight | null>(null);
-  const [isBentoAILoading, setIsBentoAILoading] = useState(false);
-  const [todayTelemetry, setTodayTelemetry] = useState<BentoInputData>({
-    consumedCalories: 0,
-    burnedCalories: 0,
-    dailyCalorieGoal: 2000,
-    consumedWaterLiters: 0,
-    waterGoalLiters: 2.5,
-    consumedProtein: 0,
-    proteinGoal: 150,
-    consumedCarbs: 0,
-    carbsGoal: 200,
-    consumedFat: 0,
-    fatGoal: 65,
-  });
-
   const fetchBentoAI = useCallback(
-    async (userId: string, telemetryData: BentoInputData, forceRefresh = false) => {
+    async (userId: string, telemetryData: BentoInputData, forceRefresh = false, requestId?: number) => {
       // 1. Check cached insight from database / storage first
       const cached = await getCachedBentoInsight(userId);
+      if (requestId !== undefined && requestId !== requestIdRef.current) return;
       if (cached) {
         setBentoInsight(cached);
       }
@@ -113,12 +138,15 @@ export default function AnalyticsTabScreen() {
         setIsBentoAILoading(true);
         try {
           const freshInsight = await generateBentoInsightsWithAI(telemetryData);
+          if (requestId !== undefined && requestId !== requestIdRef.current) return;
           setBentoInsight(freshInsight);
           await saveBentoInsightToStorageAndDB(userId, freshInsight);
         } catch (err) {
           console.error('Error generating Bento AI insight:', err);
         } finally {
-          setIsBentoAILoading(false);
+          if (requestId === undefined || requestId === requestIdRef.current) {
+            setIsBentoAILoading(false);
+          }
         }
       }
     },
@@ -127,7 +155,7 @@ export default function AnalyticsTabScreen() {
 
   const handleRefreshBentoAI = () => {
     if (user?.id) {
-      fetchBentoAI(user.id, todayTelemetry, true);
+      fetchBentoAI(user.id, todayTelemetry, true, requestIdRef.current);
     }
   };
 
@@ -166,6 +194,7 @@ export default function AnalyticsTabScreen() {
       // Fetch Today's Daily Log from Database
       const todayStr = dateKey(new Date());
       const todayLog = await getDailyLogByDate(userId, todayStr);
+      if (requestId !== requestIdRef.current) return;
 
       const liveTelemetry: BentoInputData = {
         consumedCalories: todayLog.consumedCalories || 0,
@@ -185,7 +214,7 @@ export default function AnalyticsTabScreen() {
       };
 
       setTodayTelemetry(liveTelemetry);
-      fetchBentoAI(userId, liveTelemetry, false);
+      fetchBentoAI(userId, liveTelemetry, false, requestId);
 
       await fetchWeekData(userId, requestId);
     } catch (error) {
@@ -208,6 +237,7 @@ export default function AnalyticsTabScreen() {
     const currentDayIndex = (today.getDay() + 6) % 7;
     const streakData: WeekStreakData[] = [];
     const calorieRows: WeekCaloriesData[] = [];
+    const macroRows: WeekMacroData[] = [];
     const waterRows: WeekWaterData[] = [];
 
     for (let i = 0; i < 7; i++) {
@@ -224,6 +254,26 @@ export default function AnalyticsTabScreen() {
         consumed: log.consumedCalories || 0,
         burned: log.burnedCalories || 0,
       });
+
+      // Calculate macro calories (Protein: 4 cal/g, Carbs: 4 cal/g, Fat: 9 cal/g)
+      let pCal = Math.round((log.consumedProtein || 0) * 4);
+      let cCal = Math.round((log.consumedCarbs || 0) * 4);
+      let fCal = Math.round((log.consumedFat || 0) * 9);
+
+      // Fallback distribution if consumedCalories > 0 but individual macros weren't explicitly entered
+      if (pCal === 0 && cCal === 0 && fCal === 0 && (log.consumedCalories || 0) > 0) {
+        pCal = Math.round((log.consumedCalories || 0) * 0.3);
+        cCal = Math.round((log.consumedCalories || 0) * 0.45);
+        fCal = Math.round((log.consumedCalories || 0) * 0.25);
+      }
+
+      macroRows.push({
+        day: WEEK_DAY_DDD[i],
+        proteinCal: pCal,
+        carbsCal: cCal,
+        fatCal: fCal,
+      });
+
       waterRows.push({
         day: WEEK_DAY_DDD[i],
         liters: log.consumedWaterLiters || 0,
@@ -246,6 +296,7 @@ export default function AnalyticsTabScreen() {
     setWeekStreak(streakData);
     setCurrentStreak(streakCount);
     setWeekCalories(calorieRows);
+    setWeekMacros(macroRows);
     setWeekWater(waterRows);
   };
 
@@ -373,6 +424,8 @@ export default function AnalyticsTabScreen() {
               currentStreak={currentStreak}
               isAILoading={isBentoAILoading}
               onRefreshAI={handleRefreshBentoAI}
+              weekMacros={weekMacros}
+              isLoadingMacros={isLoading}
             />
 
             {/* Weekly Water Consumption Card */}

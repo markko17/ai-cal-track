@@ -1,4 +1,4 @@
-import Colors from '@/constants/colors';
+import WeeklyMacroBalanceCard, { WeekMacroData } from '@/components/WeeklyMacroBalanceCard';
 import { AIBentoInsight, BentoInputData } from '@/services/geminiService';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
@@ -16,6 +16,8 @@ export interface BentoGridCardProps {
   currentStreak?: number;
   isAILoading?: boolean;
   onRefreshAI?: () => void;
+  weekMacros?: WeekMacroData[];
+  isLoadingMacros?: boolean;
 }
 
 export default function BentoGridCard({
@@ -24,11 +26,11 @@ export default function BentoGridCard({
   currentStreak = 3,
   isAILoading = false,
   onRefreshAI,
+  weekMacros = [],
+  isLoadingMacros = false,
 }: BentoGridCardProps) {
   const score = aiInsight?.recoveryScore ?? 45;
   const netCalories = (telemetry.consumedCalories || 0) - (telemetry.burnedCalories || 0);
-  const targetCalories = telemetry.dailyCalorieGoal || 2450;
-  const isUnderTarget = telemetry.consumedCalories < targetCalories;
 
   const defaultAssessment =
     "You've built great momentum in the latter half of the week with three consecutive active days. Focusing on hitting your calorie and protein targets more consistently will help you maximize your results and energy levels.";
@@ -116,7 +118,7 @@ export default function BentoGridCard({
         <View style={styles.pillOrange}>
           <Ionicons name="trending-down" size={14} color="#D97706" />
           <Text style={styles.pillOrangeText}>
-            {netCalories < 0 ? 'Energy Gap' : 'Target Status'}
+            {aiInsight?.statusLabel || (netCalories < 0 ? 'Energy Gap' : 'Target Status')}
           </Text>
         </View>
       </View>
@@ -130,6 +132,11 @@ export default function BentoGridCard({
         <Text style={styles.activityBody}>
           {aiInsight?.actionableTip || defaultMomentumText}
         </Text>
+      </View>
+
+      {/* Weekly Macro Balance Graph (under Mid-Week Momentum) */}
+      <View style={styles.macroGraphWrapper}>
+        <WeeklyMacroBalanceCard data={weekMacros} isLoading={isLoadingMacros} />
       </View>
     </View>
   );
@@ -350,5 +357,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     opacity: 0.8,
     marginTop: 8,
+  },
+  macroGraphWrapper: {
+    marginTop: 14,
   },
 });
