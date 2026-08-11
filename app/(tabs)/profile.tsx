@@ -28,18 +28,7 @@ export default function ProfileTabScreen() {
   const [profileData, setProfileData] = useState<any>(null);
 
   // Modals state
-  const [activeModal, setActiveModal] = useState<
-    'freeTrial' | 'personalDetails' | 'preferences' | 'requestFeatures' | 'contactUs' | 'terms' | 'privacy' | null
-  >(null);
-
-  // Preferences local state
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [darkTheme, setDarkTheme] = useState(false);
-  const [metricUnits, setMetricUnits] = useState(true);
-
-  // Request feature state
-  const [featureInput, setFeatureInput] = useState('');
-  const [featureSubmitted, setFeatureSubmitted] = useState(false);
+  const [activeModal, setActiveModal] = useState<'freeTrial' | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,11 +69,9 @@ export default function ProfileTabScreen() {
             try {
               await clearUserSession();
               await signOut();
+              router.replace('/');
             } catch (err: any) {
               console.error('Error during sign out:', err);
-            } finally {
-              router.dismissAll();
-              router.replace('/');
             }
           },
         },
@@ -96,19 +83,7 @@ export default function ProfileTabScreen() {
   const userFullName = user?.fullName || user?.firstName || 'Fitness Enthusiast';
   const userAvatar = user?.imageUrl;
 
-  const handleSendFeatureRequest = () => {
-    if (!featureInput.trim()) {
-      Alert.alert('Empty Request', 'Please enter a feature suggestion.');
-      return;
-    }
-    setFeatureSubmitted(true);
-    setTimeout(() => {
-      setFeatureSubmitted(false);
-      setFeatureInput('');
-      setActiveModal(null);
-      Alert.alert('Thank You!', 'Your feature request has been submitted to our product team.');
-    }, 800);
-  };
+
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -229,8 +204,15 @@ export default function ProfileTabScreen() {
             {/* Contact us */}
             <TouchableOpacity
               style={styles.menuItemRow}
-              onPress={() => {
-                Linking.openURL('mailto:marklagdaan606@gmail.com?subject=AI Cal Track Support&body=Hello Support Team,');
+              onPress={async () => {
+                const subject = encodeURIComponent('AI Cal Track Support');
+                const body = encodeURIComponent('Hello Support Team,');
+                try {
+                  await Linking.openURL(`mailto:support@aicaltrack.com?subject=${subject}&body=${body}`);
+                } catch (err) {
+                  Alert.alert('Error', 'Unable to open email client.');
+                  console.error('Error opening mail client:', err);
+                }
               }}
               activeOpacity={0.7}
             >
@@ -283,7 +265,7 @@ export default function ProfileTabScreen() {
       {/* --- MODAL DIALOGS --- */}
 
       {/* Free Trial / Premium Modal */}
-      <Modal visible={activeModal === 'freeTrial'} transparent animationType="slide">
+      <Modal visible={activeModal === 'freeTrial'} transparent animationType="slide" onRequestClose={() => setActiveModal(null)}>
         <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
@@ -321,7 +303,7 @@ export default function ProfileTabScreen() {
                 <View style={styles.trialHighlightBox}>
                   <Ionicons name="gift-outline" size={24} color="#8B5CF6" />
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.trialBoxTitle}>7 Days Free, then $4.99/mo</Text>
+                    <Text style={styles.trialBoxTitle}>7 Days Free Trial</Text>
                     <Text style={styles.trialBoxSub}>Cancel anytime from app settings</Text>
                   </View>
                 </View>
@@ -330,7 +312,7 @@ export default function ProfileTabScreen() {
                   style={styles.primaryActionBtn}
                   onPress={() => {
                     setActiveModal(null);
-                    Alert.alert('7-Day Free Trial Activated!', 'Enjoy full access to all AI Cal Track Pro features!');
+                    Alert.alert('Feature coming soon!', 'In-app purchases are not integrated yet.');
                   }}
                 >
                   <Ionicons name="sparkles" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
@@ -342,239 +324,7 @@ export default function ProfileTabScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Personal Details Modal */}
-      <Modal visible={activeModal === 'personalDetails'} transparent animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContentCard}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={styles.modalHeaderTitle}>Personal Details</Text>
-                  <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtnIcon}>
-                    <Ionicons name="close" size={22} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
 
-                <View style={styles.detailsListCard}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Full Name</Text>
-                    <Text style={styles.detailVal}>{userFullName}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Email</Text>
-                    <Text style={styles.detailVal}>{userEmail}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Primary Goal</Text>
-                    <Text style={[styles.detailVal, { color: Colors.primary }]}>
-                      {profileData?.goal || 'Maintain Weight'}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Height</Text>
-                    <Text style={styles.detailVal}>{profileData?.height || "5'9\""}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Current Weight</Text>
-                    <Text style={styles.detailVal}>{profileData?.weight || '75 kg'}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Workout Frequency</Text>
-                    <Text style={styles.detailVal}>{profileData?.workoutDays || '3-4 days/week'}</Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Calculated BMI</Text>
-                    <Text style={styles.detailVal}>
-                      {profileData?.bmi ? `${profileData.bmi} (${profileData.bmiCategory})` : '23.0 (Normal)'}
-                    </Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.secondaryActionBtn}
-                  onPress={() => {
-                    setActiveModal(null);
-                    router.push('/onboarding' as any);
-                  }}
-                >
-                  <Ionicons name="refresh-outline" size={18} color={Colors.primary} style={{ marginRight: 8 }} />
-                  <Text style={styles.secondaryActionBtnText}>Re-run AI Goal Onboarding</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-
-      {/* Request New Features Modal */}
-      <Modal visible={activeModal === 'requestFeatures'} transparent animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContentCard}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={styles.modalHeaderTitle}>Request New Features</Text>
-                  <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtnIcon}>
-                    <Ionicons name="close" size={22} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.inputGuideText}>
-                  What features or improvements would you like to see in AI Cal Track?
-                </Text>
-
-                <TextInput
-                  style={styles.featureTextInput}
-                  placeholder="e.g. Intermittent fasting timer, Barcode scanner, Recipe importer..."
-                  placeholderTextColor={Colors.textMuted}
-                  multiline
-                  numberOfLines={4}
-                  value={featureInput}
-                  onChangeText={setFeatureInput}
-                  textAlignVertical="top"
-                />
-
-                <TouchableOpacity
-                  style={styles.primaryActionBtn}
-                  onPress={handleSendFeatureRequest}
-                  disabled={featureSubmitted}
-                >
-                  <Ionicons name="send-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryActionBtnText}>
-                    {featureSubmitted ? 'Submitting...' : 'Submit Suggestion'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Contact Us Modal */}
-      <Modal visible={activeModal === 'contactUs'} transparent animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContentCard}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={styles.modalHeaderTitle}>Contact Us</Text>
-                  <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtnIcon}>
-                    <Ionicons name="close" size={22} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.contactItemRow}>
-                  <View style={[styles.menuIconBg, { backgroundColor: '#EFF6FF' }]}>
-                    <Ionicons name="mail-outline" size={20} color="#2563EB" />
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.contactTitle}>Support Email</Text>
-                    <Text style={styles.contactSub}>support@aicaltrack.com</Text>
-                  </View>
-                </View>
-
-                <View style={styles.contactItemRow}>
-                  <View style={[styles.menuIconBg, { backgroundColor: '#F5F3FF' }]}>
-                    <Ionicons name="chatbubbles-outline" size={20} color="#7C3AED" />
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.contactTitle}>Community Support</Text>
-                    <Text style={styles.contactSub}>discord.gg/aicaltrack</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.primaryActionBtn}
-                  onPress={() => {
-                    setActiveModal(null);
-                    Alert.alert('Email Client Opened', 'Opening support@aicaltrack.com...');
-                  }}
-                >
-                  <Ionicons name="mail" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryActionBtnText}>Send an Email</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Terms and Condition Modal */}
-      <Modal visible={activeModal === 'terms'} transparent animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContentCard}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={styles.modalHeaderTitle}>Terms & Conditions</Text>
-                  <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtnIcon}>
-                    <Ionicons name="close" size={22} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView style={{ maxHeight: 280, marginVertical: 10 }}>
-                  <Text style={styles.legalBodyText}>
-                    Welcome to AI Cal Track. By using our application, you agree to comply with and be bound by the
-                    following terms and conditions of use.
-                    {'\n\n'}
-                    1. Services Offered: AI Cal Track provides AI-driven nutrition estimates, calorie tracking, and
-                    fitness guidance based on user input and computer vision algorithms.
-                    {'\n\n'}
-                    2. Medical Disclaimer: Content within this app is for informational and educational purposes only and
-                    does not constitute medical advice or diagnosis. Always consult a qualified physician or nutritionist
-                    before starting any diet or workout regimen.
-                    {'\n\n'}
-                    3. Account Security: You are responsible for safeguarding your authentication credentials and keeping
-                    your account information secure.
-                  </Text>
-                </ScrollView>
-
-                <TouchableOpacity style={styles.primaryActionBtn} onPress={() => setActiveModal(null)}>
-                  <Text style={styles.primaryActionBtnText}>I Understand</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Privacy Policy Modal */}
-      <Modal visible={activeModal === 'privacy'} transparent animationType="slide">
-        <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContentCard}>
-                <View style={styles.modalHeaderRow}>
-                  <Text style={styles.modalHeaderTitle}>Privacy Policy</Text>
-                  <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtnIcon}>
-                    <Ionicons name="close" size={22} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView style={{ maxHeight: 280, marginVertical: 10 }}>
-                  <Text style={styles.legalBodyText}>
-                    Your privacy is critically important to us. AI Cal Track ensures your personal data and health
-                    metrics remain secure and protected.
-                    {'\n\n'}
-                    1. Data Collection: We collect essential account information (name, email) and user-submitted meal/fitness logs
-                    to personalize your calorie recommendations.
-                    {'\n\n'}
-                    2. Photo Data: Images scanned via AI scanner are processed securely for food macro recognition and are
-                    never sold or shared with third-party advertisers.
-                    {'\n\n'}
-                    3. Data Rights: You may request access to, export, or deletion of your personal data at any time from your account settings.
-                  </Text>
-                </ScrollView>
-
-                <TouchableOpacity style={styles.primaryActionBtn} onPress={() => setActiveModal(null)}>
-                  <Text style={styles.primaryActionBtnText}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -898,84 +648,5 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 14,
     fontWeight: '700',
-  },
-  detailsListCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    marginBottom: 10,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-  },
-  detailLabel: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-  },
-  detailVal: {
-    color: Colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  preferenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  prefLabel: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  prefSub: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  inputGuideText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  featureTextInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    color: Colors.text,
-    fontSize: 14,
-    minHeight: 100,
-    marginBottom: 20,
-  },
-  contactItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    marginBottom: 12,
-  },
-  contactTitle: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  contactSub: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-  },
-  legalBodyText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 20,
   },
 });

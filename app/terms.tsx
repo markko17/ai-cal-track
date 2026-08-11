@@ -21,6 +21,8 @@ export default function TermsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.legalBodyText}>
+            <Text style={{ fontWeight: '600', color: Colors.textSecondary, marginBottom: 12 }}>Last updated: August 2026</Text>
+            {'\n\n'}
             Welcome to AI Cal Track. By using our application, you agree to comply with and be bound by the
             following terms and conditions of use.
             {'\n\n'}

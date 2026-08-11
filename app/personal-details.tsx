@@ -57,9 +57,11 @@ export default function PersonalDetailsScreen() {
         return;
       }
       try {
-        const local = await getUserOnboardingFromStorage(user.id);
-        const dbRes = await getUserFromFirestore(user.id);
-        const data = local || dbRes.data || {};
+        let data = await getUserOnboardingFromStorage(user.id);
+        if (!data) {
+          const dbRes = await getUserFromFirestore(user.id);
+          data = dbRes.data || {};
+        }
 
         if (isMounted) {
           if (data.dailyCalorieGoal) setCalorieGoal(String(data.dailyCalorieGoal));
@@ -113,10 +115,40 @@ export default function PersonalDetailsScreen() {
 
   const handleSave = async () => {
     if (!user?.id) return;
-    if (cCal < 500 || cCal > 10000) {
-      Alert.alert('Invalid Calorie Goal', 'Please enter a daily calorie goal between 500 and 10,000 kcal.');
+    if (cCal < 500 || cCal > 10000 || pG <= 0 || cG <= 0 || fG <= 0 || wL <= 0) {
+      Alert.alert('Invalid Inputs', 'Please ensure calories are between 500-10,000 and all macros/water are positive numbers.');
       return;
     }
+
+    const calculateBMI = (hStr: string, wStr: string) => {
+      let weightKg = parseFloat(wStr) || 75;
+      if (wStr.toLowerCase().includes('lb')) {
+        weightKg = (parseFloat(wStr) || 165) * 0.453592;
+      }
+      
+      let heightCm = 175;
+      if (hStr.includes("'")) {
+        const parts = hStr.split("'");
+        const feet = parseInt(parts[0]) || 0;
+        const inches = parseInt(parts[1]?.replace('"', '')) || 0;
+        heightCm = (feet * 12 + inches) * 2.54;
+      } else {
+        heightCm = parseFloat(hStr) || 175;
+      }
+  
+      const heightM = heightCm / 100;
+      const bmi = weightKg / (heightM * heightM);
+      
+      let category = 'Normal';
+      if (bmi < 18.5) category = 'Underweight';
+      else if (bmi < 25) category = 'Normal';
+      else if (bmi < 30) category = 'Overweight';
+      else category = 'Obese';
+      
+      return { bmi: parseFloat(bmi.toFixed(1)), bmiCategory: category };
+    };
+
+    const { bmi, bmiCategory } = calculateBMI(height, weight);
 
     setIsSaving(true);
     try {
@@ -135,6 +167,8 @@ export default function PersonalDetailsScreen() {
         weight,
         goal,
         workoutDays,
+        bmi,
+        bmiCategory,
       });
 
       Alert.alert('Success!', 'Your personal details and nutrition goals have been updated.', [

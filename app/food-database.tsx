@@ -238,7 +238,7 @@ export default function FoodDatabaseScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filterContent}
             >
-              {(['All', 'High Protein', 'Low Carb', 'Low Fat', 'Snacks'] as string[]).map((filter: string) => {
+              {(['All', 'High Protein', 'Low Carb', 'Breakfast', 'Snacks'] as string[]).map((filter: string) => {
                 const isActive = activeFilter === filter;
                 return (
                   <TouchableOpacity

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Appearance,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,13 +15,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { UserPreferences } from '@/services/userService';
 
-export type ThemeType = 'system' | 'dark' | 'light';
+export type ThemeType = UserPreferences['theme'];
 
 export default function PreferencesScreen() {
   const { user } = useUser();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +66,7 @@ export default function PreferencesScreen() {
 
     setIsSaving(true);
     try {
+      Appearance.setColorScheme(selectedTheme === 'system' ? null : selectedTheme);
       await updateUserPreferences(user.id, {
         theme: selectedTheme,
         notifications: notificationsEnabled,
@@ -215,19 +219,19 @@ export default function PreferencesScreen() {
         </View>
       </ScrollView>
 
-      {/* Save Button Footer */}
-      <View style={styles.footerContainer}>
+      {/* 4. Sticky Bottom Action Bar */}
+      <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, 14) }]}>
         <TouchableOpacity
           style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
           onPress={handleSavePreferences}
           disabled={isSaving}
-          activeOpacity={0.85}
+          activeOpacity={0.8}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
             <>
-              <Ionicons name="checkmark-done" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.saveBtnText}>Save Preferences</Text>
             </>
           )}
@@ -424,7 +428,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: Colors.background,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: Colors.cardBorder,
   },

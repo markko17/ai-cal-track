@@ -24,17 +24,21 @@ export default function RequestFeaturesScreen() {
 
   const [features, setFeatures] = useState<FeatureRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchFeatures = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
     try {
       const data = await getFeatureRequests();
       setFeatures(data);
     } catch (error) {
       console.error('Failed to fetch features:', error);
+      setFetchError('Failed to load feature requests. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +95,7 @@ export default function RequestFeaturesScreen() {
       await toggleUpvote(featureId, userId);
     } catch (error) {
       // Revert on error
+      Alert.alert('Error', 'Failed to toggle upvote. Please try again.');
       fetchFeatures();
     }
   };
@@ -152,6 +157,7 @@ export default function RequestFeaturesScreen() {
                 placeholderTextColor={Colors.textMuted}
                 value={title}
                 onChangeText={setTitle}
+                maxLength={100}
               />
               <TextInput
                 style={styles.inputDesc}
@@ -162,6 +168,7 @@ export default function RequestFeaturesScreen() {
                 textAlignVertical="top"
                 value={description}
                 onChangeText={setDescription}
+                maxLength={500}
               />
               <TouchableOpacity 
                 style={[styles.submitBtn, isSubmitting && { opacity: 0.7 }]} 
@@ -184,6 +191,13 @@ export default function RequestFeaturesScreen() {
           ListEmptyComponent={
             isLoading ? (
               <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+            ) : fetchError ? (
+              <View style={{ alignItems: 'center', marginTop: 40 }}>
+                <Text style={[styles.emptyText, { color: Colors.error, marginBottom: 16 }]}>{fetchError}</Text>
+                <TouchableOpacity onPress={fetchFeatures} style={{ padding: 12, backgroundColor: Colors.surface, borderRadius: 8 }}>
+                  <Text style={{ color: Colors.primary, fontWeight: '600' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               <Text style={styles.emptyText}>No feature requests yet. Be the first to suggest one!</Text>
             )

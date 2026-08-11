@@ -21,6 +21,8 @@ export default function PrivacyScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.legalBodyText}>
+            <Text style={{ fontWeight: '600', color: Colors.textSecondary, marginBottom: 12 }}>Last updated: August 2026</Text>
+            {'\n\n'}
             Your privacy is critically important to us. AI Cal Track ensures your personal data and health metrics remain secure and protected.
             {'\n\n'}
             <Text style={styles.boldText}>1. Data Collection</Text>{'\n'}
@@ -33,7 +35,7 @@ export default function PrivacyScreen() {
             We may use trusted third-party services (like Firebase and Clerk) for authentication, database storage, and AI processing. These services adhere to strict security and privacy standards.
             {'\n\n'}
             <Text style={styles.boldText}>4. Data Rights</Text>{'\n'}
-            You have the right to access, export, or delete your personal data at any time. You can manage these preferences directly from your account settings or by contacting our support team.
+            You have the right to access, export, or delete your personal data at any time. You can manage these preferences by contacting our support team at support@aicaltrack.com.
           </Text>
         </View>
       </ScrollView>

@@ -305,7 +305,7 @@ export const updateUserPreferences = async (
   uid: string,
   preferences: UserPreferences
 ): Promise<void> => {
-  if (!uid) return;
+  if (!uid) throw new Error('User ID is required to update preferences.');
   try {
     const userRef = doc(db, 'users', uid);
     const updatePayload = {
@@ -315,15 +315,7 @@ export const updateUserPreferences = async (
 
     await setDoc(userRef, updatePayload, { merge: true });
 
-    // Sync local storage
-    const existingLocal = await getUserOnboardingFromStorage(uid);
-    const updatedLocal = {
-      ...(existingLocal || {}),
-      preferences,
-    };
-    await saveUserOnboardingToStorage(uid, updatedLocal);
-
-    console.log('✅ [Firebase] User preferences saved to Firestore and local storage:', uid, preferences);
+    console.log('✅ [Firebase] User preferences saved to Firestore:', uid, preferences);
   } catch (error) {
     console.error('❌ [Firebase] Error updating user preferences:', error);
     throw error;
@@ -342,19 +334,19 @@ export const getUserPreferences = async (uid: string): Promise<UserPreferences> 
   if (!uid) return defaultPrefs;
 
   try {
-    const localData = await getUserOnboardingFromStorage(uid);
-    if (localData?.preferences) {
-      return {
-        theme: localData.preferences.theme || 'light',
-        notifications: localData.preferences.notifications ?? true,
-      };
-    }
-
     const dbRes = await getUserFromFirestore(uid);
     if (dbRes.exists && dbRes.data?.preferences) {
       return {
         theme: dbRes.data.preferences.theme || 'light',
         notifications: dbRes.data.preferences.notifications ?? true,
+      };
+    }
+
+    const localData = await getUserOnboardingFromStorage(uid);
+    if (localData?.preferences) {
+      return {
+        theme: localData.preferences.theme || 'light',
+        notifications: localData.preferences.notifications ?? true,
       };
     }
 

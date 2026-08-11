@@ -1,13 +1,16 @@
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   doc,
+  getDoc,
   getDocs,
-  onSnapshot,
+  limit,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 
@@ -31,10 +34,12 @@ export const addFeatureRequest = async (
   userId: string
 ): Promise<string> => {
   try {
+    const safeTitle = title.substring(0, 100);
+    const safeDesc = description.substring(0, 500);
     const colRef = collection(db, COLLECTION_NAME);
     const docRef = await addDoc(colRef, {
-      title,
-      description,
+      title: safeTitle,
+      description: safeDesc,
       userId,
       upvotes: [userId], // Automatically upvote your own request
       createdAt: serverTimestamp(),
@@ -54,26 +59,19 @@ export const toggleUpvote = async (featureId: string, userId: string): Promise<v
 
   try {
     const docRef = doc(db, COLLECTION_NAME, featureId);
-    await runTransaction(db, async (transaction) => {
-      const featureDoc = await transaction.get(docRef);
-      if (!featureDoc.exists()) {
-        throw new Error('Feature request does not exist!');
-      }
+    const featureDoc = await getDoc(docRef);
+    if (!featureDoc.exists()) {
+      throw new Error('Feature request does not exist!');
+    }
 
-      const data = featureDoc.data();
-      const upvotes: string[] = data.upvotes || [];
+    const data = featureDoc.data();
+    const upvotes: string[] = data.upvotes || [];
 
-      let newUpvotes;
-      if (upvotes.includes(userId)) {
-        // Remove upvote
-        newUpvotes = upvotes.filter((id) => id !== userId);
-      } else {
-        // Add upvote
-        newUpvotes = [...upvotes, userId];
-      }
-
-      transaction.update(docRef, { upvotes: newUpvotes });
-    });
+    if (upvotes.includes(userId)) {
+      await updateDoc(docRef, { upvotes: arrayRemove(userId) });
+    } else {
+      await updateDoc(docRef, { upvotes: arrayUnion(userId) });
+    }
   } catch (error) {
     console.error('Error toggling upvote:', error);
     throw error;
@@ -86,7 +84,7 @@ export const toggleUpvote = async (featureId: string, userId: string): Promise<v
 export const getFeatureRequests = async (): Promise<FeatureRequest[]> => {
   try {
     const colRef = collection(db, COLLECTION_NAME);
-    const q = query(colRef, orderBy('createdAt', 'desc'));
+    const q = query(colRef, orderBy('createdAt', 'desc'), limit(50));
     const snapshot = await getDocs(q);
 
     const features: FeatureRequest[] = [];
