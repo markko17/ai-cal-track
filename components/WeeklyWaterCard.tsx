@@ -97,7 +97,7 @@ export default function WeeklyWaterCard({
       {/* Metrics Row */}
       <View style={styles.metricsContainer}>
         {/* Total Water */}
-        <View style={[styles.metricCard, { borderColor: 'rgba(6, 182, 212, 0.25)' }]}>
+        <View style={[styles.metricCard, { backgroundColor: 'rgba(6, 182, 212, 0.1)' }]}>
           <View style={styles.metricHeader}>
             <Ionicons name="water-outline" size={14} color={WATER_BLUE} />
             <Text style={styles.metricLabel}>Total</Text>
@@ -109,7 +109,7 @@ export default function WeeklyWaterCard({
         </View>
 
         {/* Daily Average */}
-        <View style={[styles.metricCard, { borderColor: 'rgba(59, 130, 246, 0.25)' }]}>
+        <View style={[styles.metricCard, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
           <View style={styles.metricHeader}>
             <Ionicons name="analytics-outline" size={14} color="#3B82F6" />
             <Text style={styles.metricLabel}>Daily Avg</Text>
@@ -121,7 +121,7 @@ export default function WeeklyWaterCard({
         </View>
 
         {/* Peak Day */}
-        <View style={[styles.metricCard, { borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+        <View style={[styles.metricCard, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
           <View style={styles.metricHeader}>
             <Ionicons name="trophy-outline" size={14} color="#10B981" />
             <Text style={styles.metricLabel}>Peak</Text>
@@ -241,7 +241,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
-    borderWidth: 1,
   },
   metricHeader: {
     flexDirection: 'row',

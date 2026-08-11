@@ -8,11 +8,15 @@ import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Image,
+  Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
-  View,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,6 +26,9 @@ export default function ProfileTabScreen() {
   const router = useRouter();
 
   const [profileData, setProfileData] = useState<any>(null);
+
+  // Modals state
+  const [activeModal, setActiveModal] = useState<'freeTrial' | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,102 +57,274 @@ export default function ProfileTabScreen() {
   );
 
   const handleSignOut = async () => {
-    try {
-      await clearUserSession();
-      await signOut();
-    } catch (err: any) {
-      console.error('Error during sign out:', err);
-      Alert.alert(
-        'Sign Out Notice',
-        err?.message || 'Could not complete remote sign out, but local session was cleared.'
-      );
-    } finally {
-      router.replace('/(auth)/sign-in');
-    }
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to log out of your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await clearUserSession();
+              await signOut();
+              router.replace('/');
+            } catch (err: any) {
+              console.error('Error during sign out:', err);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const userEmail = user?.primaryEmailAddress?.emailAddress || 'User';
   const userFullName = user?.fullName || user?.firstName || 'Fitness Enthusiast';
   const userAvatar = user?.imageUrl;
 
+
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header Profile Card */}
-        <View style={styles.profileHeaderCard}>
+        {/* 1. Top Header: Big Profile text on left side */}
+        <View style={styles.topHeaderRow}>
+          <Text style={styles.screenTitle}>Profile</Text>
+        </View>
+
+        {/* 2. User Info Card */}
+        <View style={styles.userCard}>
           {userAvatar ? (
-            <Image source={{ uri: userAvatar }} style={styles.avatarLarge} />
+            <Image source={{ uri: userAvatar }} style={styles.avatarImage} />
           ) : (
-            <View style={styles.avatarFallbackLarge}>
-              <Ionicons name="person" size={32} color={Colors.primary} />
+            <View style={styles.avatarFallback}>
+              <Ionicons name="person" size={28} color={Colors.primary} />
             </View>
           )}
-
-          <Text style={styles.userNameText}>{userFullName}</Text>
-          <Text style={styles.userEmailText}>{userEmail}</Text>
-
-          <View style={styles.memberPill}>
-            <Ionicons name="shield-checkmark" size={14} color={Colors.primary} />
-            <Text style={styles.memberPillText}>Clerk Authenticated</Text>
-          </View>
-        </View>
-
-        {/* Biometric & Fitness Goal Profile */}
-        <Text style={styles.sectionTitle}>Biometric & Fitness Profile</Text>
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Primary Goal</Text>
-            <Text style={[styles.infoVal, { color: Colors.primary }]}>{profileData?.goal || 'Maintain Weight'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Height</Text>
-            <Text style={styles.infoVal}>{profileData?.height || "5'9\""}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Current Weight</Text>
-            <Text style={styles.infoVal}>{profileData?.weight || '75 kg'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Workout Frequency</Text>
-            <Text style={styles.infoVal}>{profileData?.workoutDays || '3-4 days/week'}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Calculated BMI</Text>
-            <Text style={styles.infoVal}>{profileData?.bmi ? `${profileData.bmi} (${profileData.bmiCategory})` : '23.0 (Normal)'}</Text>
-          </View>
-        </View>
-
-        {/* Re-Run AI Plan Action */}
-        <TouchableOpacity
-          style={styles.rerunPlanBtn}
-          onPress={() => router.push('/onboarding' as any)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="refresh-outline" size={20} color={Colors.primary} style={{ marginRight: 8 }} />
-          <Text style={styles.rerunPlanBtnText}>Update Profile & Re-Generate AI Plan</Text>
-        </TouchableOpacity>
-
-        {/* Account ID Card */}
-        <View style={styles.infoCard}>
-          <Text style={styles.cardHeaderTitle}>Account Information</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>User ID</Text>
-            <Text style={[styles.infoVal, { maxWidth: 200 }]} numberOfLines={1}>
-              {user?.id || '—'}
+          <View style={styles.userInfoTextCol}>
+            <Text style={styles.userNameText} numberOfLines={1}>
+              {userFullName}
+            </Text>
+            <Text style={styles.userEmailText} numberOfLines={1}>
+              {userEmail}
             </Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Cloud Database</Text>
-            <Text style={styles.infoVal}>Firebase Firestore</Text>
+        </View>
+
+        {/* 3. Free Trial Banner / Card */}
+        <TouchableOpacity
+          style={styles.freeTrialCard}
+          onPress={() => setActiveModal('freeTrial')}
+          activeOpacity={0.88}
+        >
+          <View style={styles.trialLeftIconWrapper}>
+            <Ionicons name="sparkles" size={24} color="#8B5CF6" />
+          </View>
+          <View style={styles.trialTextCol}>
+            <View style={styles.trialHeaderRow}>
+              <Text style={styles.trialTitle}>Upgrade to Premium</Text>
+              <View style={styles.proBadge}>
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </View>
+            </View>
+            <Text style={styles.trialSubtext}>Start 7 days Free trial</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#8B5CF6" />
+        </TouchableOpacity>
+
+        {/* 4. Account Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeaderTitle}>Account</Text>
+          <View style={styles.sectionCard}>
+            {/* Personal Details */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={() => router.push('/personal-details' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#EEF2FF' }]}>
+                <Ionicons name="person-outline" size={20} color="#4F46E5" />
+              </View>
+              <Text style={styles.menuItemLabel}>Personal Details</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.itemDivider} />
+
+            {/* Preferences */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={() => router.push('/preferences' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#F0FDF4' }]}>
+                <Ionicons name="options-outline" size={20} color="#16A34A" />
+              </View>
+              <Text style={styles.menuItemLabel}>Preferences</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.itemDivider} />
+
+            {/* Upgrade to Premium Features */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={() => setActiveModal('freeTrial')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#FAF5FF' }]}>
+                <Ionicons name="star-outline" size={20} color="#9333EA" />
+              </View>
+              <Text style={styles.menuItemLabel}>Upgrade to Premium Features</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Sign Out Button */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
-          <Ionicons name="log-out-outline" size={20} color={Colors.error} style={{ marginRight: 8 }} />
-          <Text style={styles.signOutBtnText}>Sign Out of Account</Text>
+        {/* 5. Support Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeaderTitle}>Support</Text>
+          <View style={styles.sectionCard}>
+            {/* Request new features */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={() => router.push('/request-features' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#FFF7ED' }]}>
+                <Ionicons name="bulb-outline" size={20} color="#EA580C" />
+              </View>
+              <Text style={styles.menuItemLabel}>Request new features</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.itemDivider} />
+
+            {/* Contact us */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={async () => {
+                const subject = encodeURIComponent('AI Cal Track Support');
+                const body = encodeURIComponent('Hello Support Team,');
+                try {
+                  await Linking.openURL(`mailto:support@aicaltrack.com?subject=${subject}&body=${body}`);
+                } catch (err) {
+                  Alert.alert('Error', 'Unable to open email client.');
+                  console.error('Error opening mail client:', err);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#FEF2F2' }]}>
+                <Ionicons name="headset-outline" size={20} color="#DC2626" />
+              </View>
+              <Text style={styles.menuItemLabel}>Contact us</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.itemDivider} />
+
+            {/* Terms and condition */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={() => router.push('/terms' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#F0F9FF' }]}>
+                <Ionicons name="document-text-outline" size={20} color="#0284C7" />
+              </View>
+              <Text style={styles.menuItemLabel}>Terms and condition</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={styles.itemDivider} />
+
+            {/* Privacy policy */}
+            <TouchableOpacity
+              style={styles.menuItemRow}
+              onPress={() => router.push('/privacy' as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIconBg, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#059669" />
+              </View>
+              <Text style={styles.menuItemLabel}>Privacy policy</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 6. Logout Button (Outside of support section, at the bottom) */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut} activeOpacity={0.8}>
+          <Ionicons name="log-out-outline" size={22} color={Colors.error} style={{ marginRight: 10 }} />
+          <Text style={styles.logoutBtnText}>Logout</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* --- MODAL DIALOGS --- */}
+
+      {/* Free Trial / Premium Modal */}
+      <Modal visible={activeModal === 'freeTrial'} transparent animationType="slide" onRequestClose={() => setActiveModal(null)}>
+        <TouchableWithoutFeedback onPress={() => setActiveModal(null)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContentCard}>
+                <View style={styles.modalHeaderRow}>
+                  <View style={styles.modalTitleBadge}>
+                    <Ionicons name="sparkles" size={18} color="#8B5CF6" />
+                    <Text style={styles.modalTitleBadgeText}>PRO TRIAL</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setActiveModal(null)} style={styles.closeBtnIcon}>
+                    <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.modalMainTitle}>Unlock Unlimited AI Nutrition</Text>
+                <Text style={styles.modalSubDesc}>
+                  Experience instant AI food photo scanning, personalized macro targets, and detailed macro analytics.
+                </Text>
+
+                <View style={styles.benefitList}>
+                  <View style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.benefitText}>Unlimited Instant Food Photo Scanning</Text>
+                  </View>
+                  <View style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.benefitText}>AI Fitness & Calorie Re-calculations</Text>
+                  </View>
+                  <View style={styles.benefitItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.benefitText}>Advanced Micro & Weekly Macro Insights</Text>
+                  </View>
+                </View>
+
+                <View style={styles.trialHighlightBox}>
+                  <Ionicons name="gift-outline" size={24} color="#8B5CF6" />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.trialBoxTitle}>7 Days Free Trial</Text>
+                    <Text style={styles.trialBoxSub}>Cancel anytime from app settings</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.primaryActionBtn}
+                  onPress={() => {
+                    setActiveModal(null);
+                    Alert.alert('Feature coming soon!', 'In-app purchases are not integrated yet.');
+                  }}
+                >
+                  <Ionicons name="sparkles" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryActionBtnText}>Start 7 days Free trial</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+
     </SafeAreaView>
   );
 }
@@ -157,132 +336,317 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingBottom: 110,
   },
-  profileHeaderCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 24,
-    padding: 24,
+
+  // 1. Top Header
+  topHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    justifyContent: 'flex-start',
     marginBottom: 20,
   },
-  avatarLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: Colors.primary,
-    marginBottom: 12,
+  screenTitle: {
+    color: Colors.text,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  avatarFallbackLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.surface,
+
+  // 2. User Info Card
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+  avatarFallback: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.surfaceLight,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     justifyContent: 'center',
-
     alignItems: 'center',
-    marginBottom: 12,
+  },
+  userInfoTextCol: {
+    flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
   },
   userNameText: {
+    color: Colors.text,
+    fontSize: 19,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  userEmailText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // 3. Free Trial Banner / Card
+  freeTrialCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    marginBottom: 24,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  trialLeftIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  trialTextCol: {
+    flex: 1,
+  },
+  trialHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trialTitle: {
+    color: '#5B21B6',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  proBadge: {
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  proBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  trialSubtext: {
+    color: '#6D28D9',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // 4 & 5. Section Containers
+  sectionContainer: {
+    marginBottom: 24,
+  },
+  sectionHeaderTitle: {
+    color: Colors.text,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  sectionCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  menuItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  menuIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  menuItemLabel: {
+    flex: 1,
+    color: Colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  itemDivider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginLeft: 68,
+  },
+
+  // 6. Logout Button
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEE2E2', // light red color
+    height: 54,
+    borderRadius: 18,
+    marginTop: 8,
+  },
+  logoutBtnText: {
+    color: Colors.error,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  // Modals Styling
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalContentCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 36,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalHeaderTitle: {
     color: Colors.text,
     fontSize: 20,
     fontWeight: '800',
   },
-  userEmailText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  memberPill: {
+  modalTitleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primaryGlow,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-    marginTop: 12,
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
   },
-  memberPillText: {
-    color: Colors.primary,
+  modalTitleBadgeText: {
+    color: '#7C3AED',
     fontSize: 12,
-    fontWeight: '700',
-    marginLeft: 6,
+    fontWeight: '800',
   },
-  sectionTitle: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  infoCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    marginBottom: 16,
-  },
-  cardHeaderTitle: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-  },
-  infoLabel: {
-    color: Colors.textMuted,
-    fontSize: 13,
-  },
-  infoVal: {
-    color: Colors.text,
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  rerunPlanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  closeBtnIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
-    backgroundColor: Colors.primaryGlow,
-    borderWidth: 1,
-    borderColor: Colors.primaryBorder,
-    height: 50,
-    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalMainTitle: {
+    color: Colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  modalSubDesc: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: 20,
   },
-  rerunPlanBtnText: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontWeight: '700',
+  benefitList: {
+    gap: 12,
+    marginBottom: 20,
   },
-  signOutBtn: {
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  benefitText: {
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  trialHighlightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9F5FF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    marginBottom: 24,
+  },
+  trialBoxTitle: {
+    color: '#5B21B6',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  trialBoxSub: {
+    color: '#6D28D9',
+    fontSize: 12,
+  },
+  primaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.errorBg,
-    borderWidth: 1,
-    borderColor: Colors.errorBorder,
+    backgroundColor: Colors.primary,
     height: 52,
-    borderRadius: 18,
-    marginTop: 8,
+    borderRadius: 16,
   },
-  signOutBtnText: {
-    color: Colors.error,
-    fontSize: 15,
+  primaryActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  secondaryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    height: 50,
+    borderRadius: 16,
+    marginTop: 16,
+  },
+  secondaryActionBtnText: {
+    color: Colors.primary,
+    fontSize: 14,
     fontWeight: '700',
   },
 });

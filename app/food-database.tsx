@@ -4,7 +4,7 @@ import {
 } from '@/services/fatsecretService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -238,7 +238,7 @@ export default function FoodDatabaseScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filterContent}
             >
-              {filters.map((filter) => {
+              {(['All', 'High Protein', 'Low Carb', 'Breakfast', 'Snacks'] as string[]).map((filter: string) => {
                 const isActive = activeFilter === filter;
                 return (
                   <TouchableOpacity
