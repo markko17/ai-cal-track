@@ -32,6 +32,12 @@ export interface UserProfileData {
   targetWeightPace?: string;
   fitnessAdvice?: string;
   onboardingCompleted?: boolean;
+  preferences?: UserPreferences;
+}
+
+export interface UserPreferences {
+  theme: 'system' | 'dark' | 'light';
+  notifications: boolean;
 }
 
 /**
@@ -291,6 +297,74 @@ export const updateUserWeight = async (uid: string, weightKg: number): Promise<v
     throw error;
   }
 };
+
+/**
+ * Update user preferences (theme, notifications) in Firestore and local storage.
+ */
+export const updateUserPreferences = async (
+  uid: string,
+  preferences: UserPreferences
+): Promise<void> => {
+  if (!uid) return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    const updatePayload = {
+      preferences,
+      updatedAt: serverTimestamp(),
+    };
+
+    await setDoc(userRef, updatePayload, { merge: true });
+
+    // Sync local storage
+    const existingLocal = await getUserOnboardingFromStorage(uid);
+    const updatedLocal = {
+      ...(existingLocal || {}),
+      preferences,
+    };
+    await saveUserOnboardingToStorage(uid, updatedLocal);
+
+    console.log('✅ [Firebase] User preferences saved to Firestore and local storage:', uid, preferences);
+  } catch (error) {
+    console.error('❌ [Firebase] Error updating user preferences:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user preferences from local storage or Firestore with default fallback values (default light theme).
+ */
+export const getUserPreferences = async (uid: string): Promise<UserPreferences> => {
+  const defaultPrefs: UserPreferences = {
+    theme: 'light',
+    notifications: true,
+  };
+
+  if (!uid) return defaultPrefs;
+
+  try {
+    const localData = await getUserOnboardingFromStorage(uid);
+    if (localData?.preferences) {
+      return {
+        theme: localData.preferences.theme || 'light',
+        notifications: localData.preferences.notifications ?? true,
+      };
+    }
+
+    const dbRes = await getUserFromFirestore(uid);
+    if (dbRes.exists && dbRes.data?.preferences) {
+      return {
+        theme: dbRes.data.preferences.theme || 'light',
+        notifications: dbRes.data.preferences.notifications ?? true,
+      };
+    }
+
+    return defaultPrefs;
+  } catch (error) {
+    console.error('Error fetching user preferences:', error);
+    return defaultPrefs;
+  }
+};
+
 
 
 

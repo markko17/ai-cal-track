@@ -68,7 +68,7 @@ export default function WeeklyEnergyCard({
       {/* Energy Metrics Grid (Burned, Consumed, Net Energy) */}
       <View style={styles.metricsContainer}>
         {/* Burned Stat */}
-        <View style={[styles.metricCard, { borderColor: 'rgba(16, 185, 129, 0.25)' }]}>
+        <View style={[styles.metricCard, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
           <View style={styles.metricHeader}>
             <Ionicons name="flame" size={15} color={BURNED_COLOR} />
             <Text style={styles.metricLabel}>Burned</Text>
@@ -80,7 +80,7 @@ export default function WeeklyEnergyCard({
         </View>
 
         {/* Consumed Stat */}
-        <View style={[styles.metricCard, { borderColor: 'rgba(249, 115, 22, 0.25)' }]}>
+        <View style={[styles.metricCard, { backgroundColor: 'rgba(249, 115, 22, 0.1)' }]}>
           <View style={styles.metricHeader}>
             <Ionicons name="restaurant" size={14} color={CONSUMED_COLOR} />
             <Text style={styles.metricLabel}>Consumed</Text>
@@ -92,7 +92,7 @@ export default function WeeklyEnergyCard({
         </View>
 
         {/* Net Energy (Consumed - Burned) Stat */}
-        <View style={[styles.metricCard, { borderColor: 'rgba(139, 92, 246, 0.25)' }]}>
+        <View style={[styles.metricCard, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
           <View style={styles.metricHeader}>
             <Ionicons name="swap-vertical-outline" size={15} color={NET_COLOR} />
             <Text style={styles.metricLabel}>Net Balance</Text>
@@ -276,7 +276,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
-    borderWidth: 1,
   },
   metricHeader: {
     flexDirection: 'row',
